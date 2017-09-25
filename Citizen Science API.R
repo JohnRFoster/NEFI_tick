@@ -142,7 +142,7 @@ smam_pts <- map_ggplot(smam_occ, map = "usa", size = 2) # smam occurrences on US
 
 
 coordinates(tick_occ) <- c("longitude", "latitude")
-#coordinates(smam_occ) <- c("longitude", "latitude")
+coordinates(smam_occ) <- c("longitude", "latitude")
 
 #tick_box <- gridlines(tick_occ, easts = pretty(bbox(tick_occ)[1, ]), norths = pretty(bbox(tick_occ)[2, ]), ndiscr = 1000)
   
