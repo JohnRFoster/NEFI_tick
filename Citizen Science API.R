@@ -1,11 +1,10 @@
 library(rgbif)
 library(rinat)
 library(tidyverse)
-library(maps)
-library(mapr)
 library(sp)
 library(ggmap)
 library(raster)
+library(rasterVis)
 library(measurements)
 
 # White-footed mouse = P. leucopus
@@ -129,20 +128,50 @@ inat_occ <- inat_occ[ , inat_return] # the above two calls rename and remove som
 # Map - Citizen Science Tick Dataset - Combined GBIF & iNat
 
 # all tick observations from GBIF and iNat, then select 'name', 'latitude', and 'longitude' columns
-tick_occ <- bind_rows(gbif_occ, inat_occ) %>% select(name, latitude, longitude) %>% 
+tick_occ <- bind_rows(gbif_occ, inat_occ) %>% dplyr::select(name, latitude, longitude) %>% 
   filter(name == "Ixodes pacificus" | name == "Ixodes scapularis") # extract just tick occurrences
 
 # all small mammal (smam) observation from GBIF and iNat, select 'name', 'latitude', and 'longitude' columns
-smam_occ <- bind_rows(gbif_occ, inat_occ) %>% select(name, latitude, longitude) %>% 
+smam_occ <- bind_rows(gbif_occ, inat_occ) %>% dplyr::select(name, latitude, longitude) %>% 
   filter(name == "Peromyscus leucopus" | name == "Tamias striatus" | name == "Blarina brevicauda" |
   name == "Sorex cinereus") # extract just smam occurrences
 
 tick_pts <- map_ggplot(tick_occ, map = "usa", size = 2) # tick occurrences on USA map
 smam_pts <- map_ggplot(smam_occ, map = "usa", size = 2) # smam occurrences on USA map
 
+tick_xy <- tick_occ[c("name", "longitude", "latitude")] # subset of tick occurrences
+smam_xy <- smam_occ[c("name", "longitude", "latitude")] # subset of smam occurrences
 
-coordinates(tick_occ) <- c("longitude", "latitude")
-coordinates(smam_occ) <- c("longitude", "latitude")
+coordinates(tick_xy) <- c("longitude", "latitude") # convert tick_xy to class "SpatialPointsDataFrame"
+coordinates(smam_xy) <- c("longitude", "latitude") # convert smam_xy to class "SpatialPointsDataFrame"
 
-#tick_box <- gridlines(tick_occ, easts = pretty(bbox(tick_occ)[1, ]), norths = pretty(bbox(tick_occ)[2, ]), ndiscr = 1000)
-  
+
+tick.r <- raster()
+extent(tick.r) <- extent(tick_xy)
+ncol(tick.r) <- 20
+nrow(tick.r) <- 25
+tick.r.count <- rasterize(tick_xy, tick.r, field = tick_xy$name, fun = 'count') # count number of tick occurrences in each cell
+
+#tick.r.mean <- rasterize(tick_xy, tick.r, field = tick_xy$name, fun = mean)
+
+#tick.r.mean <- rasterize(tick_xy, tick.r, field = tick_xy$name, fun = function(tick_xy, na.rm){ if(na.rm)mean(na.omit(tick_xy))
+#                         else(mean(tick_xy))}, na.rm = TRUE)
+
+
+smam.r <- raster()
+extent(smam.r) <- extent(smam_xy)
+ncol(smam.r) <- 20
+nrow(smam.r) <- 25
+smam.r.count <- rasterize(smam_xy, smam.r, field = smam_xy$name, fun = 'count') # count number of smam occurrences in each cell
+
+usa.map <- getData(name = "GADM", country = "usa", level = 0) # USA boarder map; class "SpatialPolygonsDataFrame"
+usa.map <- crop(usa.map, extent(-130, -65, 23, 52))
+plot(usa.map)
+
+tick.map <- levelplot(tick.r.count) +
+  layer(sp.polygons(usa.map))
+plot(tick.map)
+
+smam.map <- levelplot(smam.r.count) + 
+  layer(sp.polygons(usa.map))
+plot(smam.map)
