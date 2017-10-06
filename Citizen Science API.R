@@ -125,7 +125,7 @@ inat_occ <- inat_occ[ , inat_return] # the above two calls rename and remove som
 
 #--------------------------------------------------
 
-# Map - Citizen Science Tick Dataset - Combined GBIF & iNat
+# Combine GBIF and iNat datasets for ticks and smams, then seperate ticks and smams into their own data frame
 
 # all tick observations from GBIF and iNat, then select 'name', 'latitude', and 'longitude' columns
 tick_occ <- bind_rows(gbif_occ, inat_occ) %>% dplyr::select(name, latitude, longitude) %>% 
@@ -136,42 +136,37 @@ smam_occ <- bind_rows(gbif_occ, inat_occ) %>% dplyr::select(name, latitude, long
   filter(name == "Peromyscus leucopus" | name == "Tamias striatus" | name == "Blarina brevicauda" |
   name == "Sorex cinereus") # extract just smam occurrences
 
-tick_pts <- map_ggplot(tick_occ, map = "usa", size = 2) # tick occurrences on USA map
-smam_pts <- map_ggplot(smam_occ, map = "usa", size = 2) # smam occurrences on USA map
+#---------------------------------------------------
 
-tick_xy <- tick_occ[c("name", "longitude", "latitude")] # subset of tick occurrences
-smam_xy <- smam_occ[c("name", "longitude", "latitude")] # subset of smam occurrences
-
-coordinates(tick_xy) <- c("longitude", "latitude") # convert tick_xy to class "SpatialPointsDataFrame"
-coordinates(smam_xy) <- c("longitude", "latitude") # convert smam_xy to class "SpatialPointsDataFrame"
-
-
-tick.r <- raster()
-extent(tick.r) <- extent(tick_xy)
-ncol(tick.r) <- 20
-nrow(tick.r) <- 25
-tick.r.count <- rasterize(tick_xy, tick.r, field = tick_xy$name, fun = 'count') # count number of tick occurrences in each cell
-
-#tick.r.mean <- rasterize(tick_xy, tick.r, field = tick_xy$name, fun = mean)
-
-#tick.r.mean <- rasterize(tick_xy, tick.r, field = tick_xy$name, fun = function(tick_xy, na.rm){ if(na.rm)mean(na.omit(tick_xy))
-#                         else(mean(tick_xy))}, na.rm = TRUE)
-
-
-smam.r <- raster()
-extent(smam.r) <- extent(smam_xy)
-ncol(smam.r) <- 20
-nrow(smam.r) <- 25
-smam.r.count <- rasterize(smam_xy, smam.r, field = smam_xy$name, fun = 'count') # count number of smam occurrences in each cell
-
+# get a map of contiguous USA boarder
 usa.map <- getData(name = "GADM", country = "usa", level = 0) # USA boarder map; class "SpatialPolygonsDataFrame"
 usa.map <- crop(usa.map, extent(-130, -65, 23, 52))
-plot(usa.map)
 
-tick.map <- levelplot(tick.r.count) +
-  layer(sp.polygons(usa.map))
-plot(tick.map)
+#---------------------------------------------------
 
-smam.map <- levelplot(smam.r.count) + 
-  layer(sp.polygons(usa.map))
-plot(smam.map)
+# function 'count.raster' creates a 'RasterLayer' object from input data and counts number of occurrences in each grid cell
+
+count.raster <- function(data, ncol, nrow) {
+  data[c("name", "longitude", "latitude")]        # subset input data
+  coordinates(data) <- c("longitude", "latitude") # convert data to class "SpatialPointsDataFrame"
+  r <- raster()                                   # initialize raster
+  extent(r) <- extent(data)                       # set extent of raster equal to input data
+  ncol(r) <- ncol
+  nrow(r) <- nrow
+  rasterize(data, r, field = data$name, fun = 'count') # creates "RasterLayer" and counts points inside each cell
+}
+
+tick.raster <- count.raster(data = tick_occ, ncol = 40, nrow = 25) # create RasterLayer of tick occurrences with grid cells
+smam.raster <- count.raster(data = smam_occ, ncol = 40, nrow = 25) # create RasterLayer of tick occurrences with grid cells
+
+#---------------------------------------------------
+
+# count.plot creates a "trellis" object 
+count.plot <- function(raster){
+ levelplot(raster) +                             # creates plot of input raster
+  layer(sp.polygons(usa.map))                    # adds usa boarder to map 
+}
+
+tick.plot <- count.plot(tick.raster)  # plots tick raster with usa.map, a trellis object
+smam.plot <- count.plot(smam.raster)  # plots smam raster with usa.map, a trellis object
+
