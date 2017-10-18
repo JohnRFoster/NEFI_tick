@@ -169,4 +169,3 @@ count.plot <- function(raster){
 
 tick.plot <- count.plot(tick.raster)  # plots tick raster with usa.map, a trellis object
 smam.plot <- count.plot(smam.raster)  # plots smam raster with usa.map, a trellis object
-
