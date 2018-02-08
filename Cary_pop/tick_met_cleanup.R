@@ -114,7 +114,7 @@ tick <- tick %>%
           mutate(n_nymphs = round(Nymphs.m2 * 450, 0)) %>%
           mutate(n_adults = round(Adults.m2 * 450, 0))
 
-tick <- tick[complete.cases(tick), ]
+tick <- tick[complete.cases(tick), ] # Rid tick data of NA values
 tick$Date <- ymd(tick$Date)
 
 tick <- union_all(tick, t.1998)
@@ -133,7 +133,20 @@ delta.adult <- rbind(delta, as.matrix(diff(tick.green$n_adult), ncol = 1))
 
 tick.green <- cbind(tick.green, delta.larvae, delta.nymph, delta.adult)
 tick.green <- tick.green[complete.cases(tick.green), ]
+##
+tick.green.e <- tick %>%
+  filter(Grid == "Green Experimental") %>%
+  inner_join(., met, by = "DATE") %>%
+  select(-day.of.year.x, -X) 
 
+delta <- as.matrix(0, ncol = 1)
+delta.larvae <- rbind(delta, as.matrix(diff(tick.green.e$n_larvae), ncol = 1))
+delta.nymph <- rbind(delta, as.matrix(diff(tick.green.e$n_nymph), ncol = 1))
+delta.adult <- rbind(delta, as.matrix(diff(tick.green.e$n_adult), ncol = 1))
+
+tick.green.e <- cbind(tick.green.e, delta.larvae, delta.nymph, delta.adult)
+tick.green.e <- tick.green.e[complete.cases(tick.green.e), ]
+##
 tick.henry <- tick %>%
   filter(Grid == "Henry Control") %>% 
   inner_join(., met, by = "DATE") %>%
@@ -146,7 +159,20 @@ delta.adult <- rbind(delta, as.matrix(diff(tick.henry$n_adult), ncol = 1))
 
 tick.henry <- cbind(tick.henry, delta.larvae, delta.nymph, delta.adult)
 tick.henry <- tick.henry[complete.cases(tick.henry), ]
+##
+tick.henry.e <- tick %>%
+  filter(Grid == "Henry Experimental") %>% 
+  inner_join(., met, by = "DATE") %>%
+  select(-day.of.year.x, -X) 
 
+delta <- as.matrix(0, ncol = 1)
+delta.larvae <- rbind(delta, as.matrix(diff(tick.henry.e$n_larvae), ncol = 1))
+delta.nymph <- rbind(delta, as.matrix(diff(tick.henry.e$n_nymph), ncol = 1))
+delta.adult <- rbind(delta, as.matrix(diff(tick.henry.e$n_adult), ncol = 1))
+
+tick.henry.e <- cbind(tick.henry.e, delta.larvae, delta.nymph, delta.adult)
+tick.henry.e <- tick.henry.e[complete.cases(tick.henry.e), ]
+##
 tick.tea <- tick %>%
   filter(Grid == "Tea Control") %>%
   inner_join(., met, by = "DATE") %>%
@@ -159,6 +185,19 @@ delta.adult <- rbind(delta, as.matrix(diff(tick.tea$n_adult), ncol = 1))
 
 tick.tea <- cbind(tick.tea, delta.larvae, delta.nymph, delta.adult)
 tick.tea <- tick.tea[complete.cases(tick.tea), ]
+##
+tick.tea.e <- tick %>%
+  filter(Grid == "Tea Experimental") %>%
+  inner_join(., met, by = "DATE") %>%
+  select(-day.of.year.x, -X) 
+
+delta <- as.matrix(0, ncol = 1)
+delta.larvae <- rbind(delta, as.matrix(diff(tick.tea.e$n_larvae), ncol = 1))
+delta.nymph <- rbind(delta, as.matrix(diff(tick.tea.e$n_nymph), ncol = 1))
+delta.adult <- rbind(delta, as.matrix(diff(tick.tea.e$n_adult), ncol = 1))
+
+tick.tea.e <- cbind(tick.tea.e, delta.larvae, delta.nymph, delta.adult)
+tick.tea.e <- tick.tea.e[complete.cases(tick.tea.e), ]
 ##########################
 
 
