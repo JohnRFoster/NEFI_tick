@@ -61,10 +61,14 @@ j.model <- jags.model(file = textConnection(model1),
 
 xx <- as.numeric(Sys.getenv("SGE_TASK_ID")) # read array job number to paste into output file
 
-for (samp in 1:10) {
-  jags.out <- coda.samples(model = j.model,
+for (samp in 1:500) {
+  if (samp == 1){
+    jags.out <- coda.samples(model = j.model,
                            variable.names = c("lambda", "theta", "N"),
                            n.iter = 1000)
+  } else {
+    jags.out <- update.jags(j.model, 1000)
+  }
   saveRDS(jags.out, file = paste("Cary_Null_Out_", xx, ".", samp, ".rds", sep = ""))
 }
 
