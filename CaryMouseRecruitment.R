@@ -1,6 +1,6 @@
 
-library(coda)
 library(rjags)
+
 
 y <- read.csv("GreenCaptHist.csv") # capture histories
 y <- apply(y, 2, as.numeric)
@@ -8,7 +8,7 @@ y <- apply(y, 2, as.numeric)
 x <- read.csv("KnownStatesGreen.csv") # known states for each individual
 x <- apply(x, 2, as.numeric)
 
-dt <- read.csv("dtGreen.csv") # days between trapping events
+dt <- read.csv("dtGreen.csv") # days between trapping events, in days
 
 data <- list(y = y,  
              dt = dt, 
@@ -38,24 +38,23 @@ for(t in 1:time){
 
 for(i in 1:ind){
 
-  ## 
-  x[i, 1] ~ dbern(gamma[1])
-  mu[i] <- x[i, 1] * theta
-  
+  ## first state process
+  x[i, 1] ~ dbern(gamma[1])  # prior on time one for each individual, based on removal entry prob
+  mu[i] <- x[i, 1] * theta   # mu = state * capture prob
+
   ## first observation
-  y[i, 1] ~ dbern(mu[i])
+  y[i, 1] ~ dbern(mu[i])     # first observation a bernouli trial with prob. mu
 
   for (t in 2:time){
 
-  ## State Process
-  q[i, t-1] <- 1 - x[i, t-1]
-  x[i, t] ~ dbern(mu1[i, t])
-  mu1[i, t] <- phi[t-1] * x[i, t-1] + gamma[t] * prod(q[i, 1:(t-1)])
+    ## State Process
+    q[i, t-1] <- 1 - x[i, t-1]
+    x[i, t] ~ dbern(mu1[i, t])
+    mu1[i, t] <- phi[t-1] * x[i, t-1] + gamma[t] * prod(q[i, 1:(t-1)])
 
-  ## Observation process
-  y[i, t] ~ dbern(mu2[i, t])
-  mu2[i, t] <- theta * x[i, t] 
-
+    ## Observation process
+    y[i, t] ~ dbern(mu2[i, t])
+    mu2[i, t] <- theta * x[i, t] 
   } # t
 } # i
 
@@ -70,7 +69,8 @@ for(t in 2:time){
 } # t
 
 psi <- sum(cprob[])               # inclusion probability
-  for(t in 1:time){
+
+for(t in 1:time){
   b[t] <- cprob[t] / psi          # entry probability
 } # t
 
@@ -84,21 +84,24 @@ for(i in 1:ind){
 for (t in 1:time){
   N[t] <- sum(x[1:ind, t])             # actual population size
   ## B[t] <- sum(recruit[1:ind, t])     # number ot entries
-  } # t
+} # t
 }"
 
 j.model <- jags.model(file = textConnection(model3),
                       data = data,
                       inits = inits,
-                      n.chains = 3)
+                      n.chains = 1)
+
 
 
 jags.out <- coda.samples(model = j.model,
                          variable.names = c("lambda", "theta", "N", "b", "psi", "gamma"),
-                         n.iter = 50000,
+                         n.iter = 5000,
                          thin = 10)
 
-saveRDS(jags.out, file = "Cary_Recruit_Out.rds")
+xx <- as.numeric(Sys.getenv("SGE_TASK_ID")) # read array job number to paste into output file
+
+saveRDS(jags.out, file = paste("Small_Cary_Recruit_Out", xx, ".rds", sep = ""))
 
 
 
