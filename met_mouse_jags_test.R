@@ -60,12 +60,15 @@ temp.max <- met %>%
 data <- list(y = ch,  
              dt = dt.1, 
              ind = nrow(ch), 
-             time = ncol(ch),
+             time = ncol(ch),             # time = capture events
              precip = precip,
              temp = temp.max,
-             days = nrow(precip),
+             days = nrow(precip),         # days = all days in time series
              a_theta = 1, b_theta = 1,
              a_lambda = 1, b_lambda = 1)
+
+data$b0 <- as.vector(c(0,0))              # regression beta means
+data$Vb <- solve(diag(10000,2))           # regression beta precisions
 
 inits <- function(){list(x = x,
                          lambda = runif(1, 0, 1),
@@ -77,69 +80,42 @@ model {
 # priors
 theta ~ dbeta(a_theta, b_theta)             # prior on capture probability
 lambda.mean ~ dgamma(a_lambda, b_lambda)    # prior on mean hazard rate
+beta ~ dmnorm(b0,Vb)                        # prior regression params
 
 for(t in 1:days){
   lambda[t] <- lambda.mean
-}
+} # t
 
+# calculate survival probability as a function of time and daily weather
 for(t in 1:(time-1)){
-  phi[t] <- exp(-lambda*dt[t])         # calculate survival probability as a function of time
-} # t                                    
+  for(i in 1:(days-1)){
+    log(phi[t]) <- exp(-sum(lambda[t[i]:t[i+1]])*dt[t]) + beta[1]*precip[t,1] + beta[2]*temp[t,1]        
+  } # i
+} # t     
 
-for(t in 1:time){
-  gamma[t] ~ dunif(0, 1)               # prior on removal entry probability
-}
-
-for(i in 1:ind){
-
-  ## first state process
-  x[i, 1] ~ dbern(gamma[1])  # prior on time one for each individual, based on removal entry prob
-  mu[i] <- x[i, 1] * theta   # mu = state * capture prob
-
-  ## first observation
-  y[i, 1] ~ dbern(mu[i])     # first observation a bernouli trial with prob. mu
-
-  for (t in 2:time){
-
-  ## State Process
-  q[i, t-1] <- 1 - x[i, t-1]
-  x[i, t] ~ dbern(mu1[i, t])
-  mu1[i, t] <- phi[t-1] * x[i, t-1] + gamma[t] * prod(q[i, 1:(t-1)])
-
-  ## Observation process
-  y[i, t] ~ dbern(mu2[i, t])
-  mu2[i, t] <- theta * x[i, t] 
-  } # t
-} # i
-
-# calculate derived population parameters
-for(t in 1:time){
-  qgamma[t] <- 1 - gamma[t]
-} # t
-cprob[1] <- gamma[1]
-
-for(t in 2:time){
-  cprob[t] <- gamma[t] * prod(qgamma[1:(t-1)])
-} # t
-
-psi <- sum(cprob[])               # inclusion probability
-
-for(t in 1:time){
-  b[t] <- cprob[t] / psi          # entry probability
-} # t
+#phi[t] <- exp(-lambda*dt[t,1])
 
 for(i in 1:ind){
-  recruit[i, 1] <- x[i, 1]
-  
-  for(t in 2:time){
-  recruit[i, t] <- (1 - x[i, t-1]) * x[i, t]
-  } # t
+
+x[i, 1] ~ dbern(0.5)
+
+for (t in (2):time){
+
+## State Process
+x[i, t] ~ dbern(mu1[i, t])
+mu1[i, t] <- phi[t-1] * x[i, t-1]
+
+## Observation process
+y[i, t] ~ dbern(mu2[i, t])
+mu2[i, t] <- theta * x[i, t] 
+} # t
 } # i
 
-for (t in 1:time){
-  N[t] <- sum(x[1:ind, t])             # actual population size
-  B[t] <- sum(recruit[1:ind, t])     # number ot entries
+# abundance estimation
+for(t in 2:(time-1)){
+N[t] <- sum(x[, t])
 } # t
+
 }"
 
 j.model <- jags.model(file = textConnection(model3),
