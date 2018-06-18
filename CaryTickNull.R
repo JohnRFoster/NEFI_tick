@@ -1,6 +1,9 @@
 library(rjags)
 
-dat.t <- read.csv("GreenTicks.csv", header = FALSE)
+t <- read.csv("tick_cleaned")
+t <- subset(t, Grid == "Green Control")
+t <- t[,c("n_larvae", "n_nymphs", "n_adults")]
+dat.t <- t(t)
 
 R <- diag(1, 3, 3)
 
@@ -74,5 +77,25 @@ jags.out <- coda.samples(jags.model,
                          n.iter = 1000000,
                          variable.names = variable.names)
 
-saveRDS(jags.out, file = "CaryTickNull.rds")
+saveRDS(jags.out, file = "/projectnb/dietzelab/fosterj/CaryTickNull.rds")
+
+trace.plot <- traceplot(dat)
+print("trace plot")
+saveRDS(trace.plot, file = "/projectnb/dietzelab/fosterj/CaryTickNull_Trace.rds")
+
+gelman.plot <- gelman.plot(dat)
+print("gelman plot")
+saveRDS(gelman.plot, file = "/projectnb/dietzelab/fosterj/CaryTickNull_gelmanplot.rds")
+
+accept.rate <- 1 - rejectionRate(dat)
+saveRDS(accept.rate, file = "/projectnb/dietzelab/fosterj/CaryTickNull_AcceptRate.rds")
+print("accept rate")
+
+save <- list(trace.plot,
+             gelman.plot,
+             accept.rate)
+
+save(save, file = "/projectnb/dietzelab/fosterj/CaryTickNullRData.RData")
+
+
 
