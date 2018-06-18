@@ -92,10 +92,6 @@ j.model <- jags.model(file = textConnection(model3),
                       inits = inits,
                       n.chains = 1)
 
-
-
-
-
 xx <- as.numeric(Sys.getenv("SGE_TASK_ID")) # read array job number to paste into output file
 
 for (samp in 1:500) {
