@@ -71,6 +71,9 @@ x <- apply(x, 2, as.numeric)
 n.caught <- apply(x, 2, sum) # minimum number alive
 print("n.caught")
 
+nsamp <- 5000
+samp <- sample.int(nrow(mfit),nsamp)
+
 ci.N <- apply(N[samp,],2,quantile,c(0.025,0.5,0.975))
 print("ci.N")
 
@@ -85,8 +88,7 @@ save(lambda.mean,
      ci.N,
      file = "/projectnb/dietzelab/fosterj/CaryMouseMetLogit.RData")
 
-# nsamp <- 5000
-# samp <- sample.int(nrow(mfit),nsamp)
+
 # dim <- c(nsamp, nrow(ch), ncol(ch))
 # x.precip <- 1:10                ## sequence of x values we're going to
 # npred <- length(xpred)              ##      make predictions for
