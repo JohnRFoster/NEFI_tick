@@ -12,9 +12,6 @@ chain2 <- list()
 for(i in 1:9){
   chain2[i] <- readRDS(file = paste("CaryMax_Recruit_Out_2.", i, ".rds", sep = ""))
 }
-c2 <- combine.mcmc(chain2)
-print("chain 2")
-
 jags.out <- mcmc.list(c1,c2)
 print("jags.out")
 
@@ -29,47 +26,63 @@ print("out$predict")
 out$params <- ecoforecastR::mat2mcmc.list(mfit[, -pred.cols])
 print("out$params")
 
-GBR <- gelman.diag(out$params)
-print("GBR")
+# GBR <- gelman.diag(out$params)
+# print("GBR")
+# 
+# burnin <- GBR$last.iter[tail(which(any(GBR$shrink[,,2] > 1.1)),1)+1]
+# cat("Burnin: ", burnin)
+# 
+# if(length(burnin) == 0) burnin = 1
+# 
+# ## remove burn-in
+# jags.burn <- window(jags.out,start = burnin)
+# print("Remove burnin")
+# 
+# jags.summary <- summary(jags.burn)
+# print("summary output")
+# 
+# mfit <- as.matrix(jags.burn)
+# print("jags matrix post burnin")
 
-burnin <- GBR$last.iter[tail(which(any(GBR$shrink[,,2] > 1.1)),1)+1]
-cat("Burnin: ", burnin)
-
-if(length(burnin) == 0) burnin = 1
-
-## remove burn-in
-jags.burn <- window(jags.out,start = burnin)
-print("Remove burnin")
-
-jags.summary <- summary(jags.burn)
-print("summary output")
-
-mfit <- as.matrix(jags.burn)
-print("jags matrix post burnin")
-
-effect.size <- effectiveSize(jags.burn)
+effect.size <- effectiveSize(out$params)
 print("effective sample size")
+
+plot <- plot(out$params)
+print("plot")
+
+trace <- traceplot(out$params)
+print("trace plot")
 
 ## grab params of interest
 lambda.mean <- mfit[, grep("lambda.mean", colnames(mfit))] 
+print("grep lambda.mean")
 N <- mfit[, grep("N",colnames(mfit))]
+print("grep N")
 lambda <- mfit[, grep("lambda",colnames(mfit))]
+print("grep lambda")
 n.mean <- apply(N, 2, mean) # calculated abundance
+print("calculate n.mean")
 
 x <- read.csv("KnownStatesGreen.csv") # known states for each individual
 x <- apply(x, 2, as.numeric)
 n.caught <- apply(x, 2, sum) # minimum number alive
-
+print("n.caught")
 
 nsamp <- 5000
 samp <- sample.int(nrow(mfit),nsamp)
-dim <- c(nsamp, nrow(ch), ncol(ch))
-xpred <- 1:50               ## sequence of x values we're going to
-npred <- length(xpred)              ##      make predictions for
-ypred <- array(0.0,dim = dim)   ## storage for predictive interval
-ycred <- array(0.0,dim = dim)   ## storage for credible interval
-
-
 
 ci.N <- apply(N[samp,],2,quantile,c(0.025,0.5,0.975))
+print("ci.N")
 
+save(lambda.mean,
+     N,
+     lambda,
+     n.mean,
+     n.caught,
+     effect.size,
+     plot,
+     trace,
+     ci.N,
+     file = "/projectnb/dietzelab/fosterj/CaryMouseRecruit.RData")
+
+prin("END FILE")
