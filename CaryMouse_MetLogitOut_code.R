@@ -29,47 +29,68 @@ print("out$predict")
 out$params <- ecoforecastR::mat2mcmc.list(mfit[, -pred.cols])
 print("out$params")
 
-GBR <- gelman.diag(out$params)
-print("GBR")
+# GBR <- gelman.diag(out$params)
+# print("GBR")
+# 
+# burnin <- GBR$last.iter[tail(which(any(GBR$shrink[,,2] > 1.1)),1)+1]
+# cat("Burnin: ", burnin)
+# 
+# if(length(burnin) == 0) burnin = 1
+# 
+# ## remove burn-in
+# jags.burn <- window(jags.out,start = burnin)
+# print("Remove burnin")
+# 
+# jags.summary <- summary(jags.burn)
+# print("summary output")
+# 
+# mfit <- as.matrix(jags.burn)
+# print("jags matrix post burnin")
 
-burnin <- GBR$last.iter[tail(which(any(GBR$shrink[,,2] > 1.1)),1)+1]
-cat("Burnin: ", burnin)
-
-if(length(burnin) == 0) burnin = 1
-
-## remove burn-in
-jags.burn <- window(jags.out,start = burnin)
-print("Remove burnin")
-
-jags.summary <- summary(jags.burn)
-print("summary output")
-
-mfit <- as.matrix(jags.burn)
-print("jags matrix post burnin")
-
-effect.size <- effectiveSize(jags.burn)
+effect.size <- effectiveSize(out$params)
 print("effective sample size")
+
+plot <- plot(out$params)
+print("plot")
+
+trace <- traceplot(out$params)
+print("trace plot")
 
 ## grab params of interest
 lambda.mean <- mfit[, grep("lambda.mean", colnames(mfit))] 
+print("grep lambda.mean")
 N <- mfit[, grep("N",colnames(mfit))]
+print("grep N")
 lambda <- mfit[, grep("lambda",colnames(mfit))]
+print("grep lambda")
 n.mean <- apply(N, 2, mean) # calculated abundance
+print("calculate n.mean")
 
 x <- read.csv("KnownStatesGreen.csv") # known states for each individual
 x <- apply(x, 2, as.numeric)
 n.caught <- apply(x, 2, sum) # minimum number alive
-
-
-nsamp <- 5000
-samp <- sample.int(nrow(mfit),nsamp)
-dim <- c(nsamp, nrow(ch), ncol(ch))
-xpred <- 1:50               ## sequence of x values we're going to
-npred <- length(xpred)              ##      make predictions for
-ypred <- array(0.0,dim = dim)   ## storage for predictive interval
-ycred <- array(0.0,dim = dim)   ## storage for credible interval
-
-
+print("n.caught")
 
 ci.N <- apply(N[samp,],2,quantile,c(0.025,0.5,0.975))
+print("ci.N")
+
+save(lambda.mean,
+     N,
+     lambda,
+     n.mean,
+     n.caught,
+     effect.size,
+     plot,
+     trace,
+     ci.N,
+     file = "/projectnb/dietzelab/fosterj/CaryMouseMetLogit.RData")
+
+# nsamp <- 5000
+# samp <- sample.int(nrow(mfit),nsamp)
+# dim <- c(nsamp, nrow(ch), ncol(ch))
+# x.precip <- 1:10                ## sequence of x values we're going to
+# npred <- length(xpred)              ##      make predictions for
+# ypred <- matrix(0.0,nrow=nsamp,ncol=npred)  ## storage for predictive interval
+# ycred <- matrix(0.0,nrow=nsamp,ncol=npred)  ## storage for credible interval
+
 
