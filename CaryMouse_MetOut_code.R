@@ -3,13 +3,13 @@ library(runjags)
 library(ecoforecastR)
 
 chain1 <- list()
-for(i in 1:9){
+for(i in 1:10){
   chain1[i] <- readRDS(file = paste("CaryMax_Recruit_Out_3.", i, ".rds", sep = ""))
 }
 c1 <- combine.mcmc(chain)1
 print("chain 1")
 chain2 <- list()
-for(i in 1:9){
+for(i in 1:10){
   chain2[i] <- readRDS(file = paste("CaryMax_Recruit_Out_2.", i, ".rds", sep = ""))
 }
 jags.out <- mcmc.list(c1,c2)
@@ -44,23 +44,23 @@ print("out$params")
 # mfit <- as.matrix(jags.burn)
 # print("jags matrix post burnin")
 
-effect.size <- effectiveSize(out$params)
+effect.size.Recruit <- effectiveSize(out$params)
 print("effective sample size")
 
-plot <- plot(out$params)
+plot.Recruit <- plot(out$params)
 print("plot")
 
-trace <- traceplot(out$params)
+trace.Recruit <- traceplot(out$params)
 print("trace plot")
 
 ## grab params of interest
-lambda.mean <- mfit[, grep("lambda.mean", colnames(mfit))] 
+lambda.mean.Recruit <- mfit[, grep("lambda.mean", colnames(mfit))] 
 print("grep lambda.mean")
-N <- mfit[, grep("N",colnames(mfit))]
+N.Recruit <- mfit[, grep("N",colnames(mfit))]
 print("grep N")
-lambda <- mfit[, grep("lambda",colnames(mfit))]
+lambda.Recruit <- mfit[, grep("lambda",colnames(mfit))]
 print("grep lambda")
-n.mean <- apply(N, 2, mean) # calculated abundance
+n.mean.Recruit <- apply(N, 2, mean) # calculated abundance
 print("calculate n.mean")
 
 x <- read.csv("KnownStatesGreen.csv") # known states for each individual
@@ -71,18 +71,18 @@ print("n.caught")
 nsamp <- 5000
 samp <- sample.int(nrow(mfit),nsamp)
 
-ci.N <- apply(N[samp,],2,quantile,c(0.025,0.5,0.975))
+ci.N.Recruit <- apply(N[samp,],2,quantile,c(0.025,0.5,0.975))
 print("ci.N")
 
-save(lambda.mean,
-     N,
-     lambda,
-     n.mean,
-     n.caught,
-     effect.size,
-     plot,
-     trace,
-     ci.N,
+save(lambda.mean.Recruit,
+     N.Recruit,
+     lambda.Recruit,
+     n.mean.Recruit,
+     #n.caught,
+     effect.size.Recruit,
+     plot.Recruit,
+     trace.Recruit,
+     ci.N.Recruit,
      file = "/projectnb/dietzelab/fosterj/CaryMouseRecruit.RData")
 
 prin("END FILE")
