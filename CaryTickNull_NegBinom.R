@@ -47,8 +47,8 @@ A[3, 3] <- phi.a
 # data
 for(t in 1:time){
 y[1, t] ~ dnegbin(p.1, x[1, t])
-y[2, t] ~ dpois(x[2, t])
-y[3, t] ~ dpois(x[3, t])
+y[2, t] ~ dnegbin(p.2, x[2, t])
+y[3, t] ~ dnegbin(p.3, x[3, t])
 } # t
 
 # first latent process this can be continuous (not pois, maybe gamma (0 bound))
