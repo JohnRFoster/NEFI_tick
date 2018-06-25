@@ -27,7 +27,7 @@ phi.n ~ dunif(0, 1)       # nymph survival
 phi.a ~ dunif(0, 1)       # adult survival
 grow.ln ~ dunif(0, 1)     # larvae -> nymph transition (*truncated(phi.l))
 grow.na ~ dunif(0, 1)     # nymph -> adult transition
-repro ~ dgamma(10, 2)     # adult -> larvae transition (reproduction)
+repro ~ dgamma(1, 1)     # adult -> larvae transition (reproduction)
 SIGMA ~ dwish(R, 3)       # variance matrix for mvn [3 x 3] default SIGMA will be *precision*
 p.1 ~ dunif(0, 1)         # probability in larvae data model
 p.2 ~ dunif(0, 1)         # probability in nymph data model
@@ -47,14 +47,14 @@ A[3, 3] <- phi.a
 # data
 for(t in 1:time){
 y[1, t] ~ dnegbin(p.1, x[1, t])
-y[2, t] ~ dnegbin(p.2, x[1, t])
-y[3, t] ~ dnegbin(p.3, x[3, t])
+y[2, t] ~ dpois(x[2, t])
+y[3, t] ~ dpois(x[3, t])
 } # t
 
 # first latent process this can be continuous (not pois, maybe gamma (0 bound))
-x[1, 1] ~ dgamma(10,4) 
-x[2, 1] ~ dgamma(10,4)
-x[3, 1] ~ dgamma(10,4) 
+x[1, 1] ~ dpois(1) 
+x[2, 1] ~ dpois(1) 
+x[3, 1] ~ dpois(1) 
 
 for(t in 1:(time-1)){
 mu[1:3, t] <- A %*% x[1:3,t]
@@ -65,7 +65,7 @@ x[1:3, t+1] ~ dmnorm(mu[1:3, t], SIGMA)
 
 jags.model <- jags.model(textConnection(tick.null),
                          data = data,
-                         n.chains = 3)
+                         n.chains = 1)
 
 variable.names <- c("phi.l",
                     "phi.n",
@@ -73,35 +73,22 @@ variable.names <- c("phi.l",
                     "grow.ln", 
                     "grow.na",
                     "repro",
-                    "SIGMA",
                     "p.1",
                     "p.2",
-                    "p.3")
+                    "p.3",
+                    "SIGMA")
+
+xx <- as.numeric(Sys.getenv("SGE_TASK_ID")) # read array job number to paste into output file
 
 jags.out <- coda.samples(jags.model,
-                         n.iter = 10000,
+                         n.iter = 250000,
                          variable.names = variable.names)
-plot(jags.out)
 
-saveRDS(jags.out, file = "/projectnb/dietzelab/fosterj/CaryTickNull.rds")
+saveRDS(jags.out, 
+        file = paste("/projectnb/dietzelab/fosterj/Previous_Runs_Tick/CaryTickNull_NegBinomAll_", xx, ".rds",
+                     sep = ""))
 
-trace.plot <- traceplot(dat)
-print("trace plot")
-saveRDS(trace.plot, file = "/projectnb/dietzelab/fosterj/CaryTickNull_Trace.rds")
 
-gelman.plot <- gelman.plot(dat)
-print("gelman plot")
-saveRDS(gelman.plot, file = "/projectnb/dietzelab/fosterj/CaryTickNull_gelmanplot.rds")
-
-accept.rate <- 1 - rejectionRate(dat)
-saveRDS(accept.rate, file = "/projectnb/dietzelab/fosterj/CaryTickNull_AcceptRate.rds")
-print("accept rate")
-
-save <- list(trace.plot,
-             gelman.plot,
-             accept.rate)
-
-save(save, file = "/projectnb/dietzelab/fosterj/CaryTickNullRData.RData")
 
 
 
