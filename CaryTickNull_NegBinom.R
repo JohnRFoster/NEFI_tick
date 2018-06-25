@@ -76,7 +76,8 @@ variable.names <- c("phi.l",
                     "p.1",
                     "p.2",
                     "p.3",
-                    "SIGMA")
+                    "SIGMA",
+                    "x")
 
 xx <- as.numeric(Sys.getenv("SGE_TASK_ID")) # read array job number to paste into output file
 
