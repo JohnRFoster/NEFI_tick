@@ -124,6 +124,8 @@ jags.model <- jags.model(textConnection(tick.met),
                          n.adapt = 100000,
                          n.chains = 1)
 
+dic.samples(jags.model, n.iter = 250000, n.adapt = 100000)
+
 variable.names <- c("phi.l.mu",
                     "phi.n.mu",
                     "phi.a.mu",
