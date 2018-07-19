@@ -42,12 +42,12 @@ data <- list(y = dat.t,
              b0 <- as.vector(c(0,0,0)),
              solve(diag(10000, 3)))
 
-inits <- function(){list(x = dat.t, # add noise/jitter to best guesse of observation error (random error)
-                         phi.l = runif(1, 0, 1),
-                         phi.n = runif(1, 0, 1),
-                         phi.a = runif(1, 0, 1),
-                         grow.ln = runif(1, 0, 1),
-                         grow.na = runif(1, 0, 1))}
+inits <- function(){list(phi.l.mu = rnorm(1, 0, 0.5),
+                         phi.n.mu = rnorm(1, 0, 0.5),
+                         phi.a.mu = rnorm(1, 0, 0.5),
+                         grow.ln.mu = rnorm(1, 0, 0.5),
+                         grow.na.mu = rnorm(1, 0, 0.5),
+                         repro.mu = rnorm(1, 0, 0.5))}
 
 tick.met = " 
 model {
