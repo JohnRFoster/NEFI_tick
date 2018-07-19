@@ -53,44 +53,54 @@ tick.met = "
 model {
 
 # priors
-phi.l.mu ~ dnorm(0, 10)       # larvae survival
-phi.n.mu ~ dnorm(0, 10)       # nymph survival
-phi.a.mu ~ dnorm(0, 10)       # adult survival
-grow.ln.mu ~ dnorm(0, 10)     # larvae -> nymph transition (*truncated(phi.l))
-grow.na.mu ~ dnorm(0, 10)     # nymph -> adult transition
-repro.mu ~ dnorm(0, 10)      # adult -> larvae transition (reproduction)
-SIGMA ~ dwish(R, 3)          # variance matrix for mvn [3 x 3] default SIGMA will be *precision*
-p.1 ~ dunif(0, 1)            # probability in larvae data model
-beta.pl ~ dmnorm(b0,Vb)                           # prior regression params
-beta.pn ~ dmnorm(b0,Vb)                           # prior regression params
-beta.pa ~ dmnorm(b0,Vb)                           # prior regression params
-beta.gln ~ dmnorm(b0,Vb)                          # prior regression params
-beta.gna ~ dmnorm(b0,Vb)                          # prior regression params
-beta.r ~ dmnorm(b0,Vb)                            # prior regression params
-
+phi.l.mu ~ dnorm(0, 0.001)       # larvae survival
+phi.n.mu ~ dnorm(0, 0.001)       # nymph survival
+phi.a.mu ~ dnorm(0, 0.001)       # adult survival
+grow.ln.mu ~ dnorm(0, 0.001)     # larvae -> nymph transition (*truncated(phi.l))
+grow.na.mu ~ dnorm(0, 0.001)     # nymph -> adult transition
+repro.mu ~ dnorm(0, 0.001) T(0,)       # adult -> larvae transition (reproduction)
+SIGMA ~ dwish(R, 3)           # variance matrix for mvn [3 x 3] default SIGMA will be *precision*
+beta.pl ~ dmnorm(b0,Vb)       # prior regression params larvae survival
+beta.pn ~ dmnorm(b0,Vb)       # prior regression params nymph survival
+beta.pa ~ dmnorm(b0,Vb)       # prior regression params adult survival
+beta.gln ~ dmnorm(b0,Vb)      # prior regression params larvae -> nymph transition
+beta.gna ~ dmnorm(b0,Vb)      # prior regression params nymph -> adult transition
+beta.r ~ dmnorm(b0,Vb)        # prior regression params reproduction
+tau.pl ~ dgamma(3, 2)
+tau.pn ~ dgamma(3, 2)
+tau.pa ~ dgamma(3, 2)
+tau.gln ~ dgamma(3, 2)
+tau.gna ~ dgamma(3, 2)
+tau.r ~ dgamma(3, 2)
 for(i in 1:temp.mis){temp[i] ~ dunif(-31, 24)}  # prior on missing temp
-for(i in 1:rh.mis){rh[i] ~ dunif(9, 100)}  # prior on missing rh
+for(i in 1:rh.mis){rh[i] ~ dunif(-53, 6)}  # prior on missing rh
 
-for(t in 1:days) {
-  logit(phi.l[t]) <- phi.l.mu + beta.pl[1]*precip[t] + beta.pl[2]*temp[t] + beta.pl[3]*rh[t]
-  logit(phi.n[t]) <- phi.n.mu + beta.pn[1]*precip[t] + beta.pn[2]*temp[t] + beta.pn[3]*rh[t]
-  logit(phi.a[t]) <- phi.a.mu + beta.pa[1]*precip[t] + beta.pa[2]*temp[t] + beta.pa[3]*rh[t]
-  logit(grow.ln[t]) <- grow.ln.mu + beta.gln[1]*precip[t] + beta.gln[2]*temp[t] + beta.gln[3]*rh[t]
-  logit(grow.na[t]) <- grow.na.mu + beta.gna[1]*precip[t] + beta.gna[2]*temp[t] + beta.gna[3]*rh[t]
-  log(repro[t]) <- repro.mu + beta.r[1]*precip + beta.r[2]*temp[t] + beta.r[3]*rh[t]
+for(t in days) {
+logit(phi.l[t]) <- phi.l.mu + beta.pl[1]*precip[t] + beta.pl[2]*temp[t] + beta.pl[3]*rh[t] + alpha.pl[t]
+logit(phi.n[t]) <- phi.n.mu + beta.pn[1]*precip[t] + beta.pn[2]*temp[t] + beta.pn[3]*rh[t] + alpha.pn[t] 
+logit(phi.a[t]) <- phi.a.mu + beta.pa[1]*precip[t] + beta.pa[2]*temp[t] + beta.pa[3]*rh[t] + alpha.pa[t] 
+logit(grow.ln[t]) <- grow.ln.mu + beta.gln[1]*precip[t] + beta.gln[2]*temp[t] + beta.gln[3]*rh[t] + alpha.gln[t] 
+logit(grow.na[t]) <- grow.na.mu + beta.gna[1]*precip[t] + beta.gna[2]*temp[t] + beta.gna[3]*rh[t] + alpha.gna[t]
+log(repro[t]) <- repro.mu + beta.r[1]*precip[t] + beta.r[2]*temp[t] + beta.r[3]*rh[t] + alpha.r[t]
+alpha.pl[t] ~ dnorm(0, tau.pl)
+alpha.pn[t] ~ dnorm(0, tau.pn)
+alpha.pa[t] ~ dnorm(0, tau.pa)
+alpha.gln[t] ~ dnorm(0, tau.gln)
+alpha.gna[t] ~ dnorm(0, tau.gna)
+alpha.r[t] ~ dnorm(0, tau.r)
 }
 
-# define transition matrix - prior on whole matrix??
-for(t in 1:days){
-  A[1, 1, t] <- phi.l[t]
-  A[1, 2, t] <- 0
-  A[1, 3, t] <- repro[t]
-  A[2, 1, t] <- grow.ln[t]
-  A[2, 2, t] <- phi.n[t]
-  A[2, 3, t] <- 0
-  A[3, 1, t] <- 0
-  A[3, 2, t] <- grow.na[t]
-  A[3, 3, t] <- phi.a[t]
+# define transition matrix 
+for(t in days){
+A[1, 1, t] <- phi.l[t]
+A[1, 2, t] <- 0
+A[1, 3, t] <- repro[t]
+A[2, 1, t] <- grow.ln[t]
+A[2, 2, t] <- phi.n[t]
+A[2, 3, t] <- 0
+A[3, 1, t] <- 0
+A[3, 2, t] <- grow.na[t]
+A[3, 3, t] <- phi.a[t]
 }
 
 # data
@@ -101,16 +111,18 @@ y[3, t] ~ dpois(x[3, t])
 } # t
 
 # first latent process this can be continuous (not pois, maybe gamma (0 bound))
-x[1, 1] ~ dpois(1) 
+x[1, 1] ~ dpois(2) 
 x[2, 1] ~ dpois(1) 
-x[3, 1] ~ dpois(1) 
+x[3, 1] ~ dpois(9) 
 
 for(t in 1:(time-1)){
-  mu[1:3, t] <- sum(A[,,dt.index[t]]:A[,,dt.index[t+1]]) %*% x[1:3,t]
-  x[1:3, t+1] ~ dmnorm(mu[1:3, t], SIGMA)
+mu[1:3, t] <- A[,,yr_mon.index[t]] %*% x[1:3,t]
+x[1:3, t+1] ~ dmnorm(mu[1:3, t], SIGMA)
 } # t
 
 }"
+
+load.module("glm")
 
 jags.model <- jags.model(textConnection(tick.met),
                          data = data,
