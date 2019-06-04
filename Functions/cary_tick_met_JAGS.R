@@ -18,7 +18,7 @@
 cary_ticks_met_JAGS <- function(state.interval=NULL){
   sites <- c("Green Control","Henry Control","Tea Control")
   N_site <- length(sites)               # number of sites
-  raw.dat <- read.csv("tick_cleaned")   # read in data
+  raw.dat <- read.csv("../tick_cleaned")   # read in data
   raw.dat$DATE <- as.Date(raw.dat$DATE) # convert to date
   
   # storage
@@ -90,7 +90,7 @@ cary_ticks_met_JAGS <- function(state.interval=NULL){
     }
   }
   
-  met <- read.csv("Met_Cary")
+  met <- read.csv("../Met_Cary")
   met <- met[, c("DATE","MIN_TEMP","MAX_TEMP","MAX_RH","TOT_PREC")]
   
   ## cumulative gdd calculation
