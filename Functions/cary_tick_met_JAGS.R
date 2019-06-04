@@ -9,14 +9,14 @@
 #' ticks) for each life stage at the user specified interval, output data list also includes
 #' the met array
 #'
-#' @param sites character vector of sites to estimate
 #' @export
 #' @examples ## to estimate every week
 #' @examples ## sites = c("Green Control","Henry Control","Tea Control")
 #' @examples cary_ticks_JAGS(sites = sites,state.null = 7)
 
 
-cary_ticks_met_JAGS <- function(sites, state.interval=NULL){
+cary_ticks_met_JAGS <- function(state.interval=NULL){
+  sites <- c("Green Control","Henry Control","Tea Control")
   N_site <- length(sites)               # number of sites
   raw.dat <- read.csv("tick_cleaned")   # read in data
   raw.dat$DATE <- as.Date(raw.dat$DATE) # convert to date
