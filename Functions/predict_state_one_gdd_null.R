@@ -19,21 +19,16 @@
 #' @param draw Vector of random draws (row numbers) or sampling
 #' @export
 
+source("Functions/site_data_met.R")
 
 predict_state_one_gdd_null <- function(type, thresh, site, params, ic, data, Nmc, draw){
   
-  # call data from model run for storage dimensions and indexing
-  if(site == "Green Control"){
-    s <- 1
-  } else if(site == "Henry Control"){
-    s <- 2
-  } else {
-    s <- 3
-  }
-  N_est <- data$N_est[s]
-  N_days <- data$N_days[s]
-  dt.index <- data$dt.index[s,]
-  df <- data$df[s,]
+  data <- site_data_met(site,met.variable=NULL,data)
+  
+  N_est <- data$N_est
+  N_days <- data$N_day
+  dt.index <- data$dt.index
+  df <- data$df
 
   # storage
   pred <- array(dim = c(3,N_est,Nmc))
