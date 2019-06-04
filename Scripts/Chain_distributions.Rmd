@@ -1,0 +1,23 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ecoforecastR)
+library(fosteR)
+library(ggplot2)
+library(ggmcmc)
+```
+
+```{r}
+load("/run/user/1000/gvfs/sftp:host=geo.bu.edu,user=fosterj/projectnb/dietzelab/fosterj/FinalOut/TempZIP/TempZIP_4_24.RData")
+
+S <- ggs(out$params)
+ggs_density(S, "SIGMA")
+ggs_density(S, "alpha")
+ggs_density(S, "beta")
+ggs_density(S, "tau")
+
+```
