@@ -19,6 +19,8 @@
 #' @param draw Vector of random draws (row numbers) or sampling
 #' @export
 
+library(mvtnorm)
+
 source("Functions/site_data_met.R")
 
 predict_state_one_gdd_null <- function(type, thresh, site, params, ic, data, Nmc, draw){
@@ -29,6 +31,7 @@ predict_state_one_gdd_null <- function(type, thresh, site, params, ic, data, Nmc
   N_days <- data$N_day
   dt.index <- data$dt.index
   df <- data$df
+  gdd <- data$gdd
 
   # storage
   pred <- array(dim = c(3,N_est,Nmc))
@@ -90,12 +93,12 @@ predict_state_one_gdd_null <- function(type, thresh, site, params, ic, data, Nmc
     
     phi.11 <- inv.logit(phi.l.mu[m])
     phi.22 <- inv.logit(phi.n.mu[m])
-    theta.32[t] <- ifelse((gdd[t] <= 750) || (gdd[t] >= 2500),inv.logit(grow.na.mu[m]),0)
+    theta.32 <- ifelse((gdd <= 750) | (gdd >= 2500),inv.logit(grow.na.mu[m]),0)
     
     if(thresh == "low"){
-      theta.21[t] <- ifelse((gdd[t] >= 500),inv.logit(grow.ln.mu[m]),0)  
+      theta.21 <- ifelse((gdd >= 500),inv.logit(grow.ln.mu[m]),0)  
     } else {
-      theta.21[t] <- ifelse((gdd[t] >= 500) && (gdd[t] <= 2000),inv.logit(grow.ln.mu[m]),0)  
+      theta.21 <- ifelse((gdd >= 500) & (gdd <= 2000),inv.logit(grow.ln.mu[m]),0)  
     }
     
     # draw transition matrix
