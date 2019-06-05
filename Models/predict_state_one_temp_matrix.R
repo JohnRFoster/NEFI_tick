@@ -1,3 +1,21 @@
+##   This is the one step ahead prediction for temp driving survival model  
+##
+##   Uncertainty partitioned for each parameter as well as initial condition and process     
+##                                                                 
+##   The state is estimated for every sampling day only, 
+##   but demographic params are estimated daily.                       
+##
+##   Zero Inflated Poisson Data model by life stage. 
+
+#' @param type type of uncertainty to simulate. Can be any of "deterministic","ic","parameter","process","larvae survival","nymph survival","adult survival","larvae-to-nymph","nymph-to-adult","reproduction"
+#' @param site site, one of "Green Control","Henry Control","Tea Control"
+#' @param params matrix of JAGS output of parameters
+#' @param ic matrix of JAGS output of states
+#' @param data model data fed to JAGS
+#' @param Nmc Number of mc samples
+#' @param draw Vector of random draws (row numbers) or sampling
+#' @export    
+
 predict_state_one_temp_matrix <- function(type, site, params, ic, data, Nmc, draw){
   
   # call data from model run for storage dimensions and indexing
