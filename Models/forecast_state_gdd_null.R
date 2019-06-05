@@ -37,9 +37,9 @@ forecast_state_gdd_null <- function(type, thresh, site, params, ic, N_est, df, N
     s <- 3
   }
   
-  dt.index <- seq(df, N_days, by = df)
-  N_est <- length(dt.index)
-  df <- rep(df, length(dt.index))
+  df <- rep(df, N_est)
+  dt.index <- cumsum(df)
+  N_days <- dt.index[length(dt.index)]
   
   # future met - technically hindcasting
   met.hind <- future_met(site, 10)
