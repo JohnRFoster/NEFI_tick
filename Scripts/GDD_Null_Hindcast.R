@@ -60,25 +60,18 @@ draw=1
 
 days <- 72+N_est
 
-plot(1:days,1:days,pch="",ylim=c(0,3000))
-lines(1:72,pred.D[1,,1])
-lines(73:days,forecast.D[1,,1])
-points(1:72,data.site$y[1,])
-
-plot(1:days,1:days,pch="",ylim=c(0,100))
-lines(1:72,pred.D[2,,1])
-lines(73:days,forecast.D[2,,1])
-points(1:72,data.site$y[2,])
-
-plot(1:days,1:days,pch="",ylim=c(0,40))
-lines(1:72,pred.D[3,,1])
-lines(73:days,forecast.D[3,,1])
-points(1:72,data.site$y[3,])
+ic.col <- "gray30"
+param.col <- "honeydew4"
+drive.col <- "honeydew3"
+process.col <- "honeydew2"
 
 Nmc <- 500 
 draw <- sample.int(nrow(params), Nmc)
 
-pred.P <- predict_state_one_gdd_null("process",
+
+### Initial Condition Unertainty ###
+
+predict.IC <- predict_state_one_gdd_null("ic",
                                      "low",
                                      site,
                                      params,
@@ -86,7 +79,7 @@ pred.P <- predict_state_one_gdd_null("process",
                                      data,
                                      Nmc,draw)
 
-forecast.P <- forecast_state_gdd_null("process",
+forecast.IC <- forecast_state_gdd_null("ic",
                                       "low",
                                       site,
                                       params,
@@ -95,30 +88,30 @@ forecast.P <- forecast_state_gdd_null("process",
                                       df,
                                       Nmc,draw)
 
-ci.P <- life.stage.ci(pred.P,"predict")
-ci.f <- life.stage.ci(forecast.P,"predict")
+predict.95ci.IC <- life.stage.ci(predict.IC,"predict")
+forecast.95ci.IC <- life.stage.ci(forecast.IC,"predict")
 
-time.1 <- 1:ncol(ci.P[[1]])
-time.2 <- (ncol(ci.P[[1]])+1):(days-2)
+time.1 <- 1:ncol(predict.95ci.IC[[1]])
+time.2 <- (ncol(predict.95ci.IC[[1]])+1):(days-2)
 time.all <- 1:(days-1)
 
 plot(time.all,pch="",ylim=c(0,2000),main="Larvae")
-ciEnvelope(time.1,ci.P[[1]][1,],ci.P[[1]][3,],col="lightblue")
-ciEnvelope(time.2,ci.f[[1]][1,],ci.f[[1]][3,],col="lightblue")
-lines(time.1,ci.P[[1]][2,])
-lines(time.2,ci.f[[1]][2,])
+ciEnvelope(time.1,predict.95ci.IC[[1]][1,],predict.95ci.IC[[1]][3,],col=ic.col)
+ciEnvelope(time.2,forecast.95ci.IC[[1]][1,],forecast.95ci.IC[[1]][3,],col=ic.col)
+lines(time.1,predict.95ci.IC[[1]][2,])
+lines(time.2,forecast.95ci.IC[[1]][2,])
 
 plot(time.all,pch="",ylim=c(0,100),main="Nymph")
-ciEnvelope(time.1,ci.P[[2]][1,],ci.P[[2]][3,],col="lightblue")
-ciEnvelope(time.2,ci.f[[2]][1,],ci.f[[2]][3,],col="lightblue")
-lines(time.1,ci.P[[2]][2,])
-lines(time.2,ci.f[[2]][2,])
+ciEnvelope(time.1,predict.95ci.IC[[2]][1,],predict.95ci.IC[[2]][3,],col=ic.col)
+ciEnvelope(time.2,forecast.95ci.IC[[2]][1,],forecast.95ci.IC[[2]][3,],col=ic.col)
+lines(time.1,predict.95ci.IC[[2]][2,])
+lines(time.2,forecast.95ci.IC[[2]][2,])
 
 plot(time.all,pch="",ylim=c(0,40),main="Adult")
-ciEnvelope(time.1,ci.P[[3]][1,],ci.P[[3]][3,],col="lightblue")
-ciEnvelope(time.2,ci.f[[3]][1,],ci.f[[3]][3,],col="lightblue")
-lines(time.1,ci.P[[3]][2,])
-lines(time.2,ci.f[[3]][2,])
+ciEnvelope(time.1,predict.95ci.IC[[3]][1,],predict.95ci.IC[[3]][3,],col=ic.col)
+ciEnvelope(time.2,forecast.95ci.IC[[3]][1,],forecast.95ci.IC[[3]][3,],col=ic.col)
+lines(time.1,predict.95ci.IC[[3]][2,])
+lines(time.2,forecast.95ci.IC[[3]][2,])
 
 
 
