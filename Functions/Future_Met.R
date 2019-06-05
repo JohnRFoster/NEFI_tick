@@ -1,11 +1,11 @@
   
 future_met <- function(site, gdd.base){
-  met <- read.csv("Met_Cary_1995_2008.csv")
+  met <- read.csv("../Met_Cary_1995_2008.csv")
   met <- met[, c("DATE","MAX_TEMP", "MIN_TEMP", "MAX_RH","TOT_PREC")]
 
   sites <- c("Green Control","Henry Control","Tea Control")
   N_site <- length(sites)               # number of sites
-  raw.dat <- read.csv("tick_cleaned")   # read in data
+  raw.dat <- read.csv("../tick_cleaned")   # read in data
   raw.dat$DATE <- as.character(raw.dat$DATE) # convert to date
   
   # find last day in timeseries for each site
