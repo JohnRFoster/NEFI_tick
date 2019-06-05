@@ -60,18 +60,18 @@ draw=1
 
 days <- 72+N_est
 
-ic.col <- "gray30"
-param.col <- "honeydew4"
-drive.col <- "honeydew3"
-process.col <- "honeydew2"
+param.col <- "gray30"
+param.ic.col <- "honeydew4"
+param.ic.drive.col <- "honeydew3"
+param.ic.drive.process.col <- "honeydew2"
 
 Nmc <- 500 
 draw <- sample.int(nrow(params), Nmc)
 
 
-### Initial Condition Unertainty ###
+### Parameter Unertainty ###
 
-predict.IC <- predict_state_one_gdd_null("ic",
+predict.param <- predict_state_one_gdd_null("parameter",
                                      "low",
                                      site,
                                      params,
@@ -79,7 +79,7 @@ predict.IC <- predict_state_one_gdd_null("ic",
                                      data,
                                      Nmc,draw)
 
-forecast.IC <- forecast_state_gdd_null("ic",
+forecast.param <- forecast_state_gdd_null("parameter",
                                       "low",
                                       site,
                                       params,
@@ -88,31 +88,130 @@ forecast.IC <- forecast_state_gdd_null("ic",
                                       df,
                                       Nmc,draw)
 
-predict.95ci.IC <- life.stage.ci(predict.IC,"predict")
-forecast.95ci.IC <- life.stage.ci(forecast.IC,"predict")
+predict.95ci.P <- life.stage.ci(predict.param,"predict")
+forecast.95ci.P <- life.stage.ci(forecast.param,"predict")
 
-time.1 <- 1:ncol(predict.95ci.IC[[1]])
-time.2 <- (ncol(predict.95ci.IC[[1]])+1):(days-2)
+time.1 <- 1:ncol(predict.95ci.P[[1]])
+time.2 <- (ncol(predict.95ci.P[[1]])+1):(days-2)
 time.all <- 1:(days-1)
 
 plot(time.all,pch="",ylim=c(0,2000),main="Larvae")
-ciEnvelope(time.1,predict.95ci.IC[[1]][1,],predict.95ci.IC[[1]][3,],col=ic.col)
-ciEnvelope(time.2,forecast.95ci.IC[[1]][1,],forecast.95ci.IC[[1]][3,],col=ic.col)
-lines(time.1,predict.95ci.IC[[1]][2,])
-lines(time.2,forecast.95ci.IC[[1]][2,])
+ciEnvelope(time.1,predict.95ci.P[[1]][1,],predict.95ci.P[[1]][3,],col=param.col)
+ciEnvelope(time.2,forecast.95ci.P[[1]][1,],forecast.95ci.P[[1]][3,],col=param.col)
+lines(time.1,predict.95ci.P[[1]][2,])
+lines(time.2,forecast.95ci.P[[1]][2,])
 
 plot(time.all,pch="",ylim=c(0,100),main="Nymph")
-ciEnvelope(time.1,predict.95ci.IC[[2]][1,],predict.95ci.IC[[2]][3,],col=ic.col)
-ciEnvelope(time.2,forecast.95ci.IC[[2]][1,],forecast.95ci.IC[[2]][3,],col=ic.col)
-lines(time.1,predict.95ci.IC[[2]][2,])
-lines(time.2,forecast.95ci.IC[[2]][2,])
+ciEnvelope(time.1,predict.95ci.P[[2]][1,],predict.95ci.P[[2]][3,],col=param.col)
+ciEnvelope(time.2,forecast.95ci.P[[2]][1,],forecast.95ci.P[[2]][3,],col=param.col)
+lines(time.1,predict.95ci.P[[2]][2,])
+lines(time.2,forecast.95ci.P[[2]][2,])
 
 plot(time.all,pch="",ylim=c(0,40),main="Adult")
-ciEnvelope(time.1,predict.95ci.IC[[3]][1,],predict.95ci.IC[[3]][3,],col=ic.col)
-ciEnvelope(time.2,forecast.95ci.IC[[3]][1,],forecast.95ci.IC[[3]][3,],col=ic.col)
-lines(time.1,predict.95ci.IC[[3]][2,])
-lines(time.2,forecast.95ci.IC[[3]][2,])
+ciEnvelope(time.1,predict.95ci.P[[3]][1,],predict.95ci.P[[3]][3,],col=param.col)
+ciEnvelope(time.2,forecast.95ci.P[[3]][1,],forecast.95ci.P[[3]][3,],col=param.col)
+lines(time.1,predict.95ci.P[[3]][2,])
+lines(time.2,forecast.95ci.P[[3]][2,])
 
 
+### Parameter + Initial Condition Unertainty ###
+type <- c("parameter","ic")
 
+predict.ic.param <- predict_state_one_gdd_null(type,
+                                         "low",
+                                         site,
+                                         params,
+                                         ic,
+                                         data,
+                                         Nmc,draw)
+
+forecast.ic.param <- forecast_state_gdd_null(type,
+                                       "low",
+                                       site,
+                                       params,
+                                       ic,
+                                       N_est,
+                                       df,
+                                       Nmc,draw)
+
+predict.95ci.P.IC <- life.stage.ci(predict.ic.param,"predict")
+forecast.95ci.P.IC <- life.stage.ci(forecast.ic.param,"predict")
+
+plot(time.all,pch="",ylim=c(0,2000),main="Larvae")
+ciEnvelope(time.1,predict.95ci.P.IC[[1]][1,],predict.95ci.P.IC[[1]][3,],col=param.ic.col)
+ciEnvelope(time.2,forecast.95ci.P.IC[[1]][1,],forecast.95ci.P.IC[[1]][3,],col=param.ic.col)
+ciEnvelope(time.1,predict.95ci.P[[1]][1,],predict.95ci.P[[1]][3,],col=param.col)
+ciEnvelope(time.2,forecast.95ci.P[[1]][1,],forecast.95ci.P[[1]][3,],col=param.col)
+lines(time.1,predict.95ci.P.IC[[1]][2,])
+lines(time.2,forecast.95ci.P.IC[[1]][2,])
+
+plot(time.all,pch="",ylim=c(0,100),main="Nymph")
+ciEnvelope(time.1,predict.95ci.P.IC[[2]][1,],predict.95ci.P.IC[[2]][3,],col=param.ic.col)
+ciEnvelope(time.2,forecast.95ci.P.IC[[2]][1,],forecast.95ci.P.IC[[2]][3,],col=param.ic.col)
+ciEnvelope(time.1,predict.95ci.P[[2]][1,],predict.95ci.P[[2]][3,],col=param.col)
+ciEnvelope(time.2,forecast.95ci.P[[2]][1,],forecast.95ci.P[[2]][3,],col=param.col)
+lines(time.1,predict.95ci.P.IC[[2]][2,])
+lines(time.2,forecast.95ci.P[[2]][2,])
+
+plot(time.all,pch="",ylim=c(0,40),main="Adult")
+ciEnvelope(time.1,predict.95ci.P.IC[[3]][1,],predict.95ci.P.IC[[3]][3,],col=param.ic.col)
+ciEnvelope(time.2,forecast.95ci.P.IC[[3]][1,],forecast.95ci.P.IC[[3]][3,],col=param.ic.col)
+ciEnvelope(time.1,predict.95ci.P[[3]][1,],predict.95ci.P[[3]][3,],col=param.col)
+ciEnvelope(time.2,forecast.95ci.P[[3]][1,],forecast.95ci.P[[3]][3,],col=param.col)
+lines(time.1,predict.95ci.P.IC[[3]][2,])
+lines(time.2,forecast.95ci.P.IC[[3]][2,])
+
+
+### Process + Parameter + Initial Condition Unertainty ###
+type <- c("process","parameter","ic")
+
+predict.ic.param.proc <- predict_state_one_gdd_null(type,
+                                         "low",
+                                         site,
+                                         params,
+                                         ic,
+                                         data,
+                                         Nmc,draw)
+
+forecast.ic.param.proc <- forecast_state_gdd_null(type,
+                                       "low",
+                                       site,
+                                       params,
+                                       ic,
+                                       N_est,
+                                       df,
+                                       Nmc,draw)
+
+predict.95ci.Proc.P.IC <- life.stage.ci(predict.ic.param.proc,"predict")
+forecast.95ci.Proc.P.IC <- life.stage.ci(forecast.ic.param.proc,"predict")
+
+plot(time.all,pch="",ylim=c(0,2000),main="Larvae")
+ciEnvelope(time.1,predict.95ci.Proc.P.IC[[1]][1,],predict.95ci.Proc.P.IC[[1]][3,],col=param.ic.drive.process.col)
+ciEnvelope(time.2,forecast.95ci.Proc.P.IC[[1]][1,],forecast.95ci.Proc.P.IC[[1]][3,],col=param.ic.drive.process.col)
+ciEnvelope(time.1,predict.95ci.P.IC[[1]][1,],predict.95ci.P.IC[[1]][3,],col=param.ic.col)
+ciEnvelope(time.2,forecast.95ci.P.IC[[1]][1,],forecast.95ci.P.IC[[1]][3,],col=param.ic.col)
+ciEnvelope(time.1,predict.95ci.P[[1]][1,],predict.95ci.P[[1]][3,],col=param.col)
+ciEnvelope(time.2,forecast.95ci.P[[1]][1,],forecast.95ci.P[[1]][3,],col=param.col)
+lines(time.1,predict.95ci.P.IC[[1]][2,])
+lines(time.2,forecast.95ci.P.IC[[1]][2,])
+
+plot(time.all,pch="",ylim=c(0,100),main="Nymph")
+ciEnvelope(time.1,predict.95ci.Proc.P.IC[[2]][1,],predict.95ci.Proc.P.IC[[2]][3,],col=param.ic.drive.process.col)
+ciEnvelope(time.2,forecast.95ci.Proc.P.IC[[2]][1,],forecast.95ci.Proc.P.IC[[2]][3,],col=param.ic.drive.process.col)
+ciEnvelope(time.1,predict.95ci.P.IC[[2]][1,],predict.95ci.P.IC[[2]][3,],col=param.ic.col)
+ciEnvelope(time.2,forecast.95ci.P.IC[[2]][1,],forecast.95ci.P.IC[[2]][3,],col=param.ic.col)
+ciEnvelope(time.1,predict.95ci.P[[2]][1,],predict.95ci.P[[2]][3,],col=param.col)
+ciEnvelope(time.2,forecast.95ci.P[[2]][1,],forecast.95ci.P[[2]][3,],col=param.col)
+lines(time.1,predict.95ci.P.IC[[2]][2,])
+lines(time.2,forecast.95ci.P[[2]][2,])
+
+plot(time.all,pch="",ylim=c(0,40),main="Adult")
+ciEnvelope(time.1,predict.95ci.Proc.P.IC[[3]][1,],predict.95ci.Proc.P.IC[[3]][3,],col=param.ic.drive.process.col)
+ciEnvelope(time.2,forecast.95ci.Proc.P.IC[[3]][1,],forecast.95ci.Proc.P.IC[[3]][3,],col=param.ic.drive.process.col)
+ciEnvelope(time.1,predict.95ci.P.IC[[3]][1,],predict.95ci.P.IC[[3]][3,],col=param.ic.col)
+ciEnvelope(time.2,forecast.95ci.P.IC[[3]][1,],forecast.95ci.P.IC[[3]][3,],col=param.ic.col)
+ciEnvelope(time.1,predict.95ci.P[[3]][1,],predict.95ci.P[[3]][3,],col=param.col)
+ciEnvelope(time.2,forecast.95ci.P[[3]][1,],forecast.95ci.P[[3]][3,],col=param.col)
+lines(time.1,predict.95ci.P.IC[[3]][2,])
+lines(time.2,forecast.95ci.P.IC[[3]][2,])
 
