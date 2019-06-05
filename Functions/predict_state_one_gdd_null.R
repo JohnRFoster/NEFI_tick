@@ -94,14 +94,11 @@ predict_state_one_gdd_null <- function(type, thresh, site, params, ic, data, Nmc
     phi.11 <- inv.logit(phi.l.mu[m])
     phi.22 <- inv.logit(phi.n.mu[m])
     theta.32 <- ifelse((gdd <= 750) | (gdd >= 2500),grow.na.mu[m],0)
-    # theta.32 <- ifelse((gdd <= 750) | (gdd >= 2500),inv.logit(grow.na.mu[m]),0)
-    
+   
     if(thresh == "low"){
-      theta.21 <- ifelse((gdd >= 500),grow.ln.mu[m],0)  
-      # theta.21 <- ifelse((gdd >= 500),inv.logit(grow.ln.mu[m]),0)  
+      theta.21 <- ifelse((gdd >= 500),grow.ln.mu[m],0)   
     } else {
       theta.21 <- ifelse((gdd >= 500) & (gdd <= 2000),grow.ln.mu[m],0)  
-      # theta.21 <- ifelse((gdd >= 500) & (gdd <= 2000),inv.logit(grow.ln.mu[m]),0)  
     }
     
     # draw transition matrix
