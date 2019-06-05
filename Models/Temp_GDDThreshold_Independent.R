@@ -13,12 +13,14 @@
 ##   Zero Inflated Poisson Data model by life stage. 
 
 #'@param site.run Which site is running? One of "Green Control", "Henry Conrtol", "Tea Control"
-#'@param met.variable One of "temp", "precip", "rh"
 #'@param n.adapt number of adaption iterations
 #'@param n.chains number of chains, 1 for parallel batch jobs
 #'@param burnin number of burnin iterations
 #'@param thin thinning interval
 #'@param n.iter number of iterations post burnin
+
+source("Functions/cary_tick_met_JAGS.R") # get data
+source("Functions/site_data_met.R") # subset data for independent fits
 
 run_model <- function(site.run,n.adapt,n.chains,burnin,thin,n.iter){
   
@@ -26,9 +28,7 @@ run_model <- function(site.run,n.adapt,n.chains,burnin,thin,n.iter){
   cat("Model Initialized and adapted after\n")
   print(start.time)
   
-  sites <- c("Green Control","Henry Control","Tea Control")
-  
-  data <- cary_ticks_met_JAGS(sites)
+  data <- cary_ticks_met_JAGS()
   
   # subset data to site.run and met variable of interest
   data <- site_data_met(site = site.run, met.variable = "temp", data)
