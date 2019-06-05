@@ -20,7 +20,7 @@
 #'@param thin thinning interval
 #'@param n.iter number of iterations post burnin
 
-run_model <- function(site.run,met.variable = "temp",n.adapt,n.chains,burnin,thin,n.iter){
+run_model <- function(site.run,n.adapt,n.chains,burnin,thin,n.iter){
   
   start.time <- Sys.time()
   cat("Model Initialized and adapted after\n")
@@ -31,7 +31,7 @@ run_model <- function(site.run,met.variable = "temp",n.adapt,n.chains,burnin,thi
   data <- cary_ticks_met_JAGS(sites)
   
   # subset data to site.run and met variable of interest
-  data <- site_data_met(site = site.run, met.variable = met.variable, data)
+  data <- site_data_met(site = site.run, met.variable = "temp", data)
   data$R <- diag(1,3,3)
   # data$b0 <- as.vector(c(0,0))      ## regression beta means
   # data$Vb <- solve(diag(100,2))   ## regression beta precision
