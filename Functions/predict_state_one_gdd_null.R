@@ -103,11 +103,11 @@ predict_state_one_gdd_null <- function(type, thresh, site, params, ic, data, Nmc
     
     # draw transition matrix
     A[1,1,] <- phi.11*(1-theta.21)
-    A[1,3,] <- exp(repro.mu[m])
     A[2,1,] <- phi.11*theta.21
     A[2,2,] <- phi.22*(1-theta.32)
     A[3,2,] <- phi.22*theta.32
     A[3,3,] <- inv.logit(phi.a.mu[m])
+    A[1,3,] <- exp(repro.mu[m])
     
     ## aggrigate transition matricies
     for(t in 1:(N_est-1)){                 # loop over the number of sampling days - 1
