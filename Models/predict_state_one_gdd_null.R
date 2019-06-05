@@ -20,6 +20,7 @@
 #' @export
 
 library(mvtnorm)
+library(boot)
 
 source("Functions/site_data_met.R")
 
