@@ -17,8 +17,8 @@ cont_model <- function(path, model, site, num.cont){
   j.model$recompile()
   
   
-  burnin <- 50000                   # burnin iterations
-  n.iter <- 750000                  # number of iterations post burnin
+  burnin <- 0                   # burnin iterations
+  n.iter <- 800000                  # number of iterations post burnin
   iter2save <- 10000                 # number of iterations to save 
   thin <- round(n.iter/iter2save)   # thinning interval
   
@@ -63,8 +63,8 @@ cont_model <- function(path, model, site, num.cont){
 
 }
 
-path <- "FinalOut/Independent_Fits/GDDThreshold/Window"
-model <- "Temp_GDDSwitch_"
-site <- "Green Control"
+path <- "../FinalOut/Independent_Fits/GDDThreshold/LowThreshOnly"
+model <- "Temp_GDDSwitch_gammaBeta33_"
+site <- "Henry Control"
 
 cont_model(path, model, site, 1)
