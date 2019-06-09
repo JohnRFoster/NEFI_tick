@@ -1,10 +1,11 @@
 #' This function combines parallel chains from JAGS 
 #'
 #'@param path file path to model out
-#'@param chain.numbs vector of chain numbers
+#'@param chain.numbs vector of chain numbers, default 1:5
+#'@param save path and name of combined chains to save as .RData, default is FALSE (does not save, just returns combined chains)
 
 
-combine_chains <- function(path, chain.numbs){
+combine_chains <- function(path, chain.numbs = 1:5, save = FALSE){
   
   # initialize
   params <- predict <- predict.m <- list()
@@ -19,6 +20,10 @@ combine_chains <- function(path, chain.numbs){
   out <- list(params = as.mcmc(params),
               predict = as.mcmc(predict),
               predict.m = as.mcmc(predict.m))
+  
+  if(!isFALSE(save)){
+    save(out, file = save)
+  }
   return(out)
 }
 
