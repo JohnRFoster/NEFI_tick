@@ -85,7 +85,8 @@ future_met <- function(site, gdd.base){
                            rh = rh,
                            rh.scale = rh.scale,
                            cum.gdd = cum.gdd,
-                           year.index = met$year)
+                           year.index = met$year,
+                           date = met$DATE)
   
   return(future.met)
 }
