@@ -22,7 +22,7 @@
 library(mvtnorm)
 library(boot)
 
-source("Functions/site_data_met.R")
+# source("Functions/site_data_met.R")
 
 predict_state_one_gdd_null <- function(type, thresh, site, params, ic, data, Nmc, draw){
   
