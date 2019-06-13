@@ -3,8 +3,9 @@
 #$ -m ea
 #$ -l buyin
 #$ -pe omp 2
-#$ -l h_rt=3:00:00
-#$ -N SaveComb
-#$ -o ../$SaveComb.log
-module load R/3.5.2
-Rscript ExploreScripts/Save_combine_chains.R
+#$ -l h_rt=100:00:00
+#$ -t 1-5
+#$ -N HB_lowGDD
+#$ -o ../$HB_lowGDD.log
+module load R
+Rscript Scripts/Run_Model.R
