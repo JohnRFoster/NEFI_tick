@@ -28,7 +28,8 @@ out.name <- "GDDSwitch_low"
 out.path <- file.path(out.folder,out.name)
 
 # compile and run model
-out <- run_model(site.run,n.adapt,n.chains,burnin,thin,n.iter)
+# out <- run_model(site.run,n.adapt,n.chains,burnin,thin,n.iter)
+out <- run_model(n.adapt,n.chains,burnin,thin,n.iter)
 
 xx <- as.numeric(Sys.getenv("SGE_TASK_ID")) # read array job number to paste into output file
 save(out, file = paste(out.path, xx, ".RData", sep = ""))
