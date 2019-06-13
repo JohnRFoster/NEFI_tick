@@ -5,7 +5,7 @@
 #$ -pe omp 2
 #$ -l h_rt=100:00:00
 #$ -t 1-5
-#$ -N HB_lowGDD
-#$ -o ../$HB_lowGDD.log
+#$ -N HB_WinGDD
+#$ -o ../$HB_WinGDD.log
 module load R
 Rscript Scripts/Run_Model.R
