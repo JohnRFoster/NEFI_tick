@@ -7,7 +7,7 @@ print("-----------------------------------------------------------------")
 library(rjags)
 
 #### model ####
-source("Models/GDD_Threshold_HB.R") 
+source("Models/GDD_Threshold_HB_Window.R") 
 
 ## model options
 # site.run <- "Green Control"      # site
@@ -23,7 +23,7 @@ thin <- round(n.iter/iter2save)   # thinning interval
 out.folder <- "../FinalOut/HB_Partial_GDD"
 
 # out.name <- paste("GDDSwitch_low", gsub(" ","",site.run),sep="_")
-out.name <- "GDDSwitch_low"
+out.name <- "GDDSwitch_Window"
 
 out.path <- file.path(out.folder,out.name)
 
