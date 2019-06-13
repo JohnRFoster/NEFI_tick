@@ -4,13 +4,13 @@ print("                         Start SCRIPT                            ")
 print("-----------------------------------------------------------------")
 
 
-library(ecoforecastR)
+library(rjags)
 
 #### model ####
-source("Models/Temp_GDDThreshold_Independent.R") 
+source("Models/GDD_Threshold_HB.R") 
 
 ## model options
-site.run <- "Green Control"      # site
+# site.run <- "Green Control"      # site
 met.variable <- NULL          # met driver on survival
 n.adapt <- 150000                  # adaptive iterations
 n.chains <- 1                     # number of chains
@@ -20,8 +20,11 @@ iter2save <- 10000                 # number of iterations to save
 thin <- round(n.iter/iter2save)   # thinning interval
 
 ## file path to output folder
-out.folder <- "../FinalOut/Independent_Fits/GDDThreshold/LowThreshOnly"
-out.name <- paste("Temp_GDDSwitch_gammaBeta33", gsub(" ","",site.run),sep="_")
+out.folder <- "../FinalOut/HB_Partial_GDD"
+out.name <- paste("GDDSwitch_low", gsub(" ","",site.run),sep="_")
+
+out.name <- "GDDSwitch_low"
+
 out.path <- file.path(out.folder,out.name)
 
 # compile and run model
