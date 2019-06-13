@@ -21,8 +21,8 @@ thin <- round(n.iter/iter2save)   # thinning interval
 
 ## file path to output folder
 out.folder <- "../FinalOut/HB_Partial_GDD"
-out.name <- paste("GDDSwitch_low", gsub(" ","",site.run),sep="_")
 
+# out.name <- paste("GDDSwitch_low", gsub(" ","",site.run),sep="_")
 out.name <- "GDDSwitch_low"
 
 out.path <- file.path(out.folder,out.name)
