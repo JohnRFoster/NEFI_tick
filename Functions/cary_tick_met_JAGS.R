@@ -133,7 +133,7 @@ cary_ticks_met_JAGS <- function(state.interval=NULL){
   #   year.mat[,i] <- subset.year
   # }
   
-  gdd <- list()
+  gdd <- matrix(NA, 3, 3767)
   met$MAX_TEMP <- scale(met$MAX_TEMP, scale = FALSE)
   met$MAX_RH <- scale(met$MAX_RH, scale = FALSE)
   met$DATE <- as.Date(met$DATE)
@@ -144,7 +144,7 @@ cary_ticks_met_JAGS <- function(state.interval=NULL){
     end <- as.Date(date.seq[[j]][nrow(date.seq[[j]]),1])
     end <- which(met$DATE == end)
     met.seq[[j]] <- start:end
-    gdd[[j]] <- cum.gdd[met.seq[[j]]]
+    gdd[j,1:length(met.seq[[j]])] <- cum.gdd[met.seq[[j]]]
   }
   
   ## met array

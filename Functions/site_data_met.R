@@ -17,7 +17,7 @@ site_data_met <- function(site, met.variable, data){
   dat.jags$N_days <- data$N_days[s]
   dat.jags$dt.index <- data$dt.index[s,]
   dat.jags$df <- data$df[s,]
-  dat.jags$gdd <- data$gdd[[s]]
+  dat.jags$gdd <- data$gdd[s,]
   # dat.jags$year <- data$year[,s]
   
   if(!is.null(met.variable)){
