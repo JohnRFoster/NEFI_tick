@@ -23,7 +23,7 @@ plot_site_posteriors <- function(all.params, n.site = 3){
     title <- colnames(all.params)[i]
     p[[i]] <- ggplot(data, aes(x = param, fill = site)) + 
       geom_density(alpha = 0.3) +
-      labs(title = title)
+      labs(title = title) 
   }
   do.call(grid.arrange,p)
 }
