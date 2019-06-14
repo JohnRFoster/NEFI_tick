@@ -74,9 +74,9 @@ run_model <- function(site.run,n.adapt,n.chains,burnin,thin,n.iter){
   grow.ln.mu ~ dbeta(0.1,1)             # larvae -> nymph transition 
   grow.na.mu ~ dbeta(0.1,1)             # nymph -> adult transiti
   repro.mu ~ dnorm(2,1)              # adult -> larvae transition (reproduction)
-  k.l2n.low ~ dnorm(400,0.1)
-  k.n2a.low ~ dnorm(700,0.1)
-  k.n2a.high ~ dnorm(2500,0.1)
+  k.l2n.low ~ dnorm(400,0.0001) T(0,)
+  k.n2a.low ~ dnorm(700,0.0001) T(0,)
+  k.n2a.high ~ dnorm(2500,0.0001) T(0,)
   
   ### precision priors
   SIGMA ~ dwish(R, 4)         # mvn [3 x 3] site process
