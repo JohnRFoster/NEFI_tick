@@ -23,7 +23,7 @@
 library(ecoforecastR)
 
 source("Functions/cary_tick_met_JAGS.R")
-run_model <- function(n.adapt,n.chains,burnin,thin,n.iter){
+run_model <- function(n.adapt,n.chains){
   
   start.time <- Sys.time()
   cat("Model Initialized and adapted after\n")
@@ -43,7 +43,8 @@ run_model <- function(n.adapt,n.chains,burnin,thin,n.iter){
                            grow.na.mu = rbeta(1, 0.1, 1),
                            alpha.22 = rnorm(3,0,0.1),
                            alpha.13 = rnorm(3,0,0.1),
-                           alpha.32 = rnorm(3,0,0.1))}
+                           alpha.k0 = rnorm(3,0,0.1),
+                           alpha.21 = rnorm(3,0,0.1))}
   
   monitor <- c("x","m",
                "deviance",
@@ -189,7 +190,7 @@ run_model <- function(n.adapt,n.chains,burnin,thin,n.iter){
     } # t
   }
   
-}" # end model
+  }" # end model
 
   load.module("glm")
   load.module("dic")
@@ -200,38 +201,20 @@ run_model <- function(n.adapt,n.chains,burnin,thin,n.iter){
                         n.adapt = n.adapt,
                         n.chains = n.chains)
   
+  return <- list(j.model = j.model,
+                 monitor = monitor,
+                 start.time = start.time)
+  
   time <- Sys.time() - start.time 
   cat("Model Initialized and adapted after\n")
   print(time)
   
-  jags.out <- coda.samples(model = j.model,
-                           variable.names = monitor,
-                           burnin = burnin,
-                           thin = thin,
-                           n.iter = n.iter)
-  
-  time <- Sys.time() - start.time 
-  cat(n.iter,"iterations complete after\n")
-  print(time)
-  
-  ## split output
-  out <- list(params = NULL, predict = NULL, m.cols = NULL)
-  mfit <- as.matrix(jags.out, chains = TRUE)
-  pred.cols <- grep("x[", colnames(mfit), fixed = TRUE)
-  m.cols <- grep("m[", colnames(mfit), fixed = TRUE)
-  chain.col <- which(colnames(mfit) == "CHAIN")
-  out$predict <- ecoforecastR::mat2mcmc.list(mfit[, c(chain.col, pred.cols)])
-  out$m.cols <- ecoforecastR::mat2mcmc.list(mfit[, c(chain.col, m.cols)])
-  out$params <- ecoforecastR::mat2mcmc.list(mfit[, -c(m.cols, pred.cols)])
-  out <- list(out = out, j.model = j.model)
-  
-  cat("\nJAGS model split and returned\n")
-  
-  time <- Sys.time() - start.time 
-  cat("\nTotal time\n")
-  print(time)
-  
-  return(out)
+  return(return)
 }
+  
+  
+  
+  
+
 
 
