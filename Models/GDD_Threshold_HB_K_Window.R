@@ -41,9 +41,16 @@ run_model <- function(n.adapt,n.chains,burnin,thin,n.iter){
                            phi.a.mu = rnorm(1, 7, 0.1),
                            grow.ln.mu = rnorm(1, -5, 0.001),
                            grow.na.mu = rbeta(1, 0.1, 1),
-                           alpha.22 = rnorm(3,0,0.1),
+                           k.l2n.low = rnorm(1, 400, 10),
+                           k.l2n.high = rnorm(1, 2000, 10),
+                           k.n2a.low = rnorm(1, 700, 10),
+                           k.n2a.high = rnorm(1, 2500, 10),
+                           alpha.11 = rnorm(3,0,0.1),
+                           alpha.33 = rnorm(3,0,0.1),
                            alpha.13 = rnorm(3,0,0.1),
-                           alpha.32 = rnorm(3,0,0.1))}
+                           alpha.21 = rnorm(3,0,0.1),
+                           alpha.k0 = rnorm(3,0,0.1),
+                           alpha.k1 = rnorm(3,0,0.1))}
   
   monitor <- c("x","m",
                "deviance",
@@ -123,23 +130,23 @@ run_model <- function(n.adapt,n.chains,burnin,thin,n.iter){
   
     # daily larvae survival by site
     logit(phi.11[s]) <- phi.l.mu + alpha.11[s]
+
+    # larvae-to-nymph transition threshold by site
+    k.0[s] <- k.l2n.low + alpha.k0[s]
+    k.1[s] <- k.l2n.low + alpha.k1[s]
     
     for(t in 1:N_days[s]){   # loop over every day in time series
       
       # larvae-to-nymph transition by site
       logit(t21[s,t]) <- grow.ln.mu + alpha.21[s]
 
-      # larvae-to-nymph transition threshold by site
-      k.0[s] <- k.l2n.low + alpha.k0[s]
-      k.1[s] <- k.l2n.low + alpha.k1[s]
-
       theta.21[s,t] <- ifelse((gdd[s,t] >= k.0[s]) && (gdd[s,t] <= k.1[s]),t21[s,t],0)
       theta.32[s,t] <- ifelse((gdd[s,t] <= k.n2a.low) || (gdd[s,t] >= k.n2a.high),grow.na.mu,0)
       
-      A.day[1,1,s,t] <- phi.11*(1-theta.21[s,t]) 
-      A.day[2,1,s,t] <- phi.11*theta.21[s,t] 
-      A.day[2,2,s,t] <- phi.22[s]*(1-theta.32[s,t]) 
-      A.day[3,2,s,t] <- phi.22[s]*theta.32[s,t]
+      A.day[1,1,s,t] <- phi.11[s]*(1-theta.21[s,t]) 
+      A.day[2,1,s,t] <- phi.11[s]*theta.21[s,t] 
+      A.day[2,2,s,t] <- phi.22*(1-theta.32[s,t]) 
+      A.day[3,2,s,t] <- phi.22*theta.32[s,t]
       log(A.day[1,3,s,t]) <- repro.mu + alpha.13[s]
       logit(A.day[3,3,s,t]) <- phi.a.mu + alpha.33[s]
       A.day[1,2,s,t] <- 0
@@ -202,6 +209,7 @@ run_model <- function(n.adapt,n.chains,burnin,thin,n.iter){
   
 }" # end model
 
+  
   load.module("glm")
   load.module("dic")
   
@@ -211,38 +219,15 @@ run_model <- function(n.adapt,n.chains,burnin,thin,n.iter){
                         n.adapt = n.adapt,
                         n.chains = n.chains)
   
+  return <- list(j.model = j.model,
+                 monitor = monitor,
+                 start.time = start.time)
+  
   time <- Sys.time() - start.time 
   cat("Model Initialized and adapted after\n")
   print(time)
   
-  jags.out <- coda.samples(model = j.model,
-                           variable.names = monitor,
-                           burnin = burnin,
-                           thin = thin,
-                           n.iter = n.iter)
-  
-  time <- Sys.time() - start.time 
-  cat(n.iter,"iterations complete after\n")
-  print(time)
-  
-  ## split output
-  out <- list(params = NULL, predict = NULL, m.cols = NULL)
-  mfit <- as.matrix(jags.out, chains = TRUE)
-  pred.cols <- grep("x[", colnames(mfit), fixed = TRUE)
-  m.cols <- grep("m[", colnames(mfit), fixed = TRUE)
-  chain.col <- which(colnames(mfit) == "CHAIN")
-  out$predict <- ecoforecastR::mat2mcmc.list(mfit[, c(chain.col, pred.cols)])
-  out$m.cols <- ecoforecastR::mat2mcmc.list(mfit[, c(chain.col, m.cols)])
-  out$params <- ecoforecastR::mat2mcmc.list(mfit[, -c(m.cols, pred.cols)])
-  out <- list(out = out, j.model = j.model)
-  
-  cat("\nJAGS model split and returned\n")
-  
-  time <- Sys.time() - start.time 
-  cat("\nTotal time\n")
-  print(time)
-  
-  return(out)
-  }
+  return(return)
+}
 
 
