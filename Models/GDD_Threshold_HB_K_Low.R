@@ -113,14 +113,14 @@ run_model <- function(n.adapt,n.chains,burnin,thin,n.iter){
   
     # daily nymph survival by site
     logit(phi.22[s]) <- phi.l.mu + alpha.22[s]
+
+    # larvae-to-nymph transition threshold by site
+    k.0[s] <- k.l2n.low + alpha.k0[s]
     
     for(t in 1:N_days[s]){   # loop over every day in time series
     
       # larvae-to-nymph transition by site
       logit(t21[s,t]) <- grow.ln.mu + alpha.21[s]
-      
-      # larvae-to-nymph transition threshold by site
-      k.0[s] <- k.l2n.low + alpha.k0[s]
       
       theta.21[s,t] <- ifelse((gdd[s,t] >= k.0[s]),t21[s,t],0)
       theta.32[s,t] <- ifelse((gdd[s,t] <= k.n2a.low) || (gdd[s,t] >= k.n2a.high),grow.na.mu,0)
