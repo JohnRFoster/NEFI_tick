@@ -38,7 +38,7 @@ run_model <- function(n.adapt,n.chains,burnin,thin,n.iter){
                            phi.l.mu = rnorm(1, 2.5, 0.1),
                            phi.n.mu = rnorm(1, 5.0631, 1.024),
                            phi.a.mu = rnorm(1, 7, 0.1),
-                           grow.ln.mu = rbeta(1, 0.1, 1),
+                           grow.ln.mu = rnorm(1, -5, 0.001),
                            grow.na.mu = rbeta(1, 0.1, 1),
                            alpha.22 = rnorm(3,0,0.1),
                            alpha.13 = rnorm(3,0,0.1),
@@ -69,7 +69,7 @@ run_model <- function(n.adapt,n.chains,burnin,thin,n.iter){
   phi.l.mu ~ dnorm(3.7815,1.7488)     # larvae survival
   phi.n.mu ~ dnorm(3.6241,0.5005)     # nymph survival
   phi.a.mu ~ dnorm(5,1)               # adult survival
-  grow.ln.mu ~ dbeta(0.1,1)           # larvae -> nymph transition 
+  grow.ln.mu ~ dnorm(-5,1)           # larvae -> nymph transition 
   grow.na.mu ~ dbeta(0.1,1)           # nymph -> adult transiti
   repro.mu ~ dnorm(2,1)               # adult -> larvae transition (reproduction)
   
@@ -103,9 +103,9 @@ run_model <- function(n.adapt,n.chains,burnin,thin,n.iter){
     
       ## Survival parameters are random intercept plus fixed effect on temperature
       ## transition is a threshold (on if within gdd window, off otherwise)
-      
-      theta.21[s,t] <- ifelse((gdd[s,t] >= 500),(grow.ln.mu + alpha.21[s]),0)
-      # theta.21[s,t] <- ifelse((gdd[s,t] >= 500) && (gdd[s,t] <= 2000),(grow.ln.mu + alpha.21[s]),0)
+
+      logit(t21[s,t]) <- grow.ln.mu + alpha.21[s]
+      theta.21[s,t] <- ifelse((gdd[s,t] >= 500),t21[s,t],0)
       theta.32[s,t] <- ifelse((gdd[s,t] <= 750) || (gdd[s,t] >= 2500),grow.na.mu,0)
       
       A.day[1,1,s,t] <- phi.11*(1-theta.21[s,t]) 
