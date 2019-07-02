@@ -48,9 +48,7 @@ run_model <- function(n.adapt,n.chains){
                            alpha.11 = rnorm(3,0,0.001),
                            alpha.33 = rnorm(3,0,0.001),
                            alpha.13 = rnorm(3,0,0.001),
-                           alpha.21 = rnorm(3,0,0.001),
-                           alpha.k0 = rnorm(3,0,0.001),
-                           alpha.k1 = rnorm(3,0,0.001))}
+                           alpha.21 = rnorm(3,0,0.001))}
   
   monitor <- c("x","m",
                "deviance",
@@ -72,14 +70,10 @@ run_model <- function(n.adapt,n.chains){
                "alpha.33",
                "alpha.13",
                "alpha.21",
-               "alpha.k0",
-               "alpha.k1",
                "tau.11",
                "tau.33",
                "tau.13",
-               "tau.21",
-               "tau.k0",
-               "tau.k1")
+               "tau.21")
   
   model = " model {
   
@@ -101,8 +95,6 @@ run_model <- function(n.adapt,n.chains){
   tau.33 ~ dgamma(0.01,0.01)       # random site effect: adult survival
   tau.13 ~ dgamma(0.01,0.01)       # random site effect: reproduction
   tau.21 ~ dgamma(0.01,0.01)       # random site effect: larvae-to-nymph
-  tau.k0 ~ dgamma(0.01,0.01)       # random site effect: larvae-to-nymph k low
-  tau.k1 ~ dgamma(0.01,0.01)       # random site effect: larvae-to-nymph k high
   
   ### Random site affect priors
   for(s in 1:3){
@@ -110,8 +102,6 @@ run_model <- function(n.adapt,n.chains){
     alpha.33[s] ~ dnorm(0, tau.33)
     alpha.13[s] ~ dnorm(0, tau.13)
     alpha.21[s] ~ dnorm(0, tau.21)
-    alpha.k0[s] ~ dnorm(0, tau.k0)
-    alpha.k1[s] ~ dnorm(0, tau.k1)
   }
   
   ### first latent process
@@ -131,16 +121,12 @@ run_model <- function(n.adapt,n.chains){
     # daily larvae survival by site
     logit(phi.11[s]) <- phi.l.mu + alpha.11[s]
 
-    # larvae-to-nymph transition threshold by site
-    k.0[s] <- k.l2n.low + alpha.k0[s]
-    k.1[s] <- k.l2n.high + alpha.k1[s]
-    
     for(t in 1:N_days[s]){   # loop over every day in time series
       
       # larvae-to-nymph transition by site
       logit(t21[s,t]) <- grow.ln.mu + alpha.21[s]
 
-      theta.21[s,t] <- ifelse((gdd[s,t] >= k.0[s]) && (gdd[s,t] <= k.1[s]),t21[s,t],0)
+      theta.21[s,t] <- ifelse((gdd[s,t] >= k.l2n.low) && (gdd[s,t] <= k.l2n.high),t21[s,t],0)
       theta.32[s,t] <- ifelse((gdd[s,t] <= k.n2a.low) || (gdd[s,t] >= k.n2a.high),grow.na.mu,0)
       
       A.day[1,1,s,t] <- phi.11[s]*(1-theta.21[s,t]) 
