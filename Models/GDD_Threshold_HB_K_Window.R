@@ -23,7 +23,7 @@
 library(ecoforecastR)
 
 source("Functions/cary_tick_met_JAGS.R")
-run_model <- function(n.adapt,n.chains,burnin,thin,n.iter){
+run_model <- function(n.adapt,n.chains){
   
   start.time <- Sys.time()
   cat("Model Initialized and adapted after\n")
@@ -45,12 +45,12 @@ run_model <- function(n.adapt,n.chains,burnin,thin,n.iter){
                            k.l2n.high = rnorm(1, 2000, 10),
                            k.n2a.low = rnorm(1, 700, 10),
                            k.n2a.high = rnorm(1, 2500, 10),
-                           alpha.11 = rnorm(3,0,0.1),
-                           alpha.33 = rnorm(3,0,0.1),
-                           alpha.13 = rnorm(3,0,0.1),
-                           alpha.21 = rnorm(3,0,0.1),
-                           alpha.k0 = rnorm(3,0,0.1),
-                           alpha.k1 = rnorm(3,0,0.1))}
+                           alpha.11 = rnorm(3,0,0.001),
+                           alpha.33 = rnorm(3,0,0.001),
+                           alpha.13 = rnorm(3,0,0.001),
+                           alpha.21 = rnorm(3,0,0.001),
+                           alpha.k0 = rnorm(3,0,0.001),
+                           alpha.k1 = rnorm(3,0,0.001))}
   
   monitor <- c("x","m",
                "deviance",
@@ -133,7 +133,7 @@ run_model <- function(n.adapt,n.chains,burnin,thin,n.iter){
 
     # larvae-to-nymph transition threshold by site
     k.0[s] <- k.l2n.low + alpha.k0[s]
-    k.1[s] <- k.l2n.low + alpha.k1[s]
+    k.1[s] <- k.l2n.high + alpha.k1[s]
     
     for(t in 1:N_days[s]){   # loop over every day in time series
       
