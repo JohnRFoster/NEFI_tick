@@ -9,7 +9,7 @@
 
 source('Functions/combine_chains.R')
 
-ammend_chains <- function(dir, num.chains, num.out, thin = 5000, save = NULL){
+ammend_chains <- function(dir, num.chains, num.out, thin = 5000, save = FALSE){
   
   all.chains <- list()
   for(c in 1:num.chains){
@@ -44,8 +44,8 @@ ammend_chains <- function(dir, num.chains, num.out, thin = 5000, save = NULL){
                    predict = as.mcmc(all.chains$predict),
                    m.cols = as.mcmc(all.chains$m.cols))
   
-  if(!is.null(save)){
-    save(out.test, file = file.path(dir,save))
+  if(save){
+    save(out.test, file = paste(dir, "_AllChains.RData", sep = ""))
   }
   return(out.test)
 }
