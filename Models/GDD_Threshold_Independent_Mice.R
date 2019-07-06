@@ -38,8 +38,8 @@ run_model <- function(site.run,n.adapt,n.chains){
   
   # get mice data
   mice <- mice_estimated_jags(site.run)
-  data$mice.mean <- mice$mice.mean 
-  data$mice.prec <- mice$mice.prec 
+  data$mice.mean <- round(mice$mice.mean, 0) 
+  # data$mice.prec <- mice$mice.prec 
     
     
 inits <- function(){list(x = data$y,
@@ -97,13 +97,13 @@ logit(phi.22) <- phi.n.mu
 for(t in 1:N_days){   # loop over every day in time series
   
   ### EIV mice
-  mice[t] ~ dnorm(mice.mean[t], mice.prec[t]) T(0,)
+  mice[t] ~ dpois(mice.mean[t])
 
   logit(t21[t]) <- grow.ln.mu + beta.21*mice[t]
   logit(t32[t]) <- grow.na.mu + beta.32*mice[t]
 
-  # theta.21[t] <- ifelse((gdd[t] >= 500),t21[t],0)
-  theta.21[t] <- ifelse((gdd[t] >= 500) && (gdd[t] <= 2000),t21[t],0)
+  theta.21[t] <- ifelse((gdd[t] >= 500),t21[t],0)
+  # theta.21[t] <- ifelse((gdd[t] >= 500) && (gdd[t] <= 2000),t21[t],0)
 
   theta.32[t] <- ifelse((gdd[t] <= 750) || (gdd[t] >= 2500),t32[t],0)
 
