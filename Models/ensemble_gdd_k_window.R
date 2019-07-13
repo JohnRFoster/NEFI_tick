@@ -101,17 +101,11 @@ ensemble_gdd_k_window <- function(site, params, ic, gdd, N_days, Nmc){
     # Nprev[3,1] <- rpois(1, ic[3,1])
     
     ## aggrigate transition matricies
-    TRANS <- A[,,1]
+    TRANS <- A[,,1] %*% A[,,2]
     
-    for(t in 1:N_days){
-      if(t == 2){
-        TRANS <- A[,,1] %*% A[,,2]
-      } else if(t >=3){
-        TRANS <- A[,,1] %*% A[,,2]
-        for(d in 3:N_days){
-          TRANS <- TRANS %*% A[,,d]
-        }
-      }
+    for(t in 3:N_days){
+      TRANS <- TRANS %*% A[,,d]
+    }
       
       # predict questing ticks
       Ex <- TRANS %*% Nprev
@@ -127,7 +121,6 @@ ensemble_gdd_k_window <- function(site, params, ic, gdd, N_days, Nmc){
       Nprev[1,1] <- pred[1,t,m]
       Nprev[2,1] <- pred[2,t,m]
       Nprev[3,1] <- pred[3,t,m]
-    }
   }
   return(pred)
 } # close function
