@@ -44,7 +44,7 @@ ammend_chains <- function(dir, num.chains, num.out, thin = 5000, save = FALSE){
                    predict = as.mcmc(all.chains$predict),
                    m.cols = as.mcmc(all.chains$m.cols))
   
-  if(save){
+  if(is.character(save)){
     save(out.test, file = paste(dir, "_AllChains.RData", sep = ""))
   }
   return(out.test)
