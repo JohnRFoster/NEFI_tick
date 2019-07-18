@@ -51,6 +51,17 @@ mice_estimated_jags <- function(site.run){
   
   # create data frame and calculate mean and standard dev
   mice.sort.all.days <- do.call(cbind, mice.est.ci)
+  
+  mice.int <- round(mice.sort.all.days, 0)
+  
+  wght <- function(vec){
+    small <- min(vec) 
+    if(small > 1){
+      seq <- rep(0, small-1)
+    }
+  }
+  
+  
   mice.all.days.mean <- apply(mice.sort.all.days, 2, mean)
   mice.all.days.sd <- apply(mice.sort.all.days, 2, sd)
   
