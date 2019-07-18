@@ -21,8 +21,9 @@ get_ticks_2006_2018 <- function(site){
   
   df <- diff.Date(individual.ticks$Date)
   
-  return <- list(individual.ticks = t(individual.ticks[,-1]),
-                 df = df)
+  return <- list(obs = t(individual.ticks[,-1]),
+                 df = df,
+                 date = individual.ticks$Date)
   
   return(return)
 }
