@@ -5,16 +5,11 @@ source("Functions/split_mice.R")
 source("Functions/plot_posterior_chains.R")
 source("Functions/plot_post_prior.R")
 
-dir <- "../FinalOut/HB_Partial_GDD/K_estimate/WindowLoop/GDDSwitch_K_Window"
+dir <- "../FinalOut/HB_Partial_GDD/K_estimate/WindowLoop_4alpha/GDDSwitch_K_Window4alpha"
 num.chains <- 5
-num.out <- 6
+num.out <- 19
 
-out <- ammend_chains(dir, num.chains, num.out)
-
-load("../FinalOut/Independent_Fits/GDDThreshold/WithMice/WindowLoop/TeaControl_GDDSwitch_Low_Mice_AllChains.RData")
-
-# out$params <- window(out$params, 2000)
-# out$params <- out$params[c(1,3,4)]
+out <- ammend_chains(dir, num.chains, num.out, save = "GDDSwitch_K_Window4alpha")
 
 plot(out$params)
 plot_posterior_chains(out$params)
@@ -28,9 +23,9 @@ plot_posterior_chains(out$params, c("alpha.11[3]",
                                     "repro.mu"))
 
 
-dir <- "../FinalOut/Independent_Fits/GDDThreshold/WithMice/LowLoop/HenryControl_GDDSwitch_Low_Mice"
+dir <- "../FinalOut/HB_Partial_GDD/Mice/WindowLoop/GDDSwitch_Mice_Win"
 num.chains <- 5
-num.out <- 27
+num.out <- 2
 
 out <- ammend_chains(dir, num.chains, num.out)
 model <- split_mice(out)
@@ -44,6 +39,16 @@ plot_posterior_chains(model$params, c("deviance",
                                       "phi.n.mu",
                                       "repro.mu"))
 
+for(i in 1:5){
+  print(i)
+  print(model$params[[i]][1,"beta.21"])
+  print(range(model$params[[i]][,"beta.21"]))
+  print(model$params[[i]][1,"beta.32"])
+  print(range(model$params[[i]][,"beta.32"]))
+}
+
+
+
 mice.est <- as.matrix(model$mice)
 
 mice.ci <- apply(mice.est, 2, quantile, c(0.025, 0.5, 0.975))
@@ -56,7 +61,7 @@ lines(time, mice.ci[2,])
 
 
 
-dir <- "../FinalOut/Independent_Fits/GDDThreshold/WithMice/LowLoop"
+dir <- "../FinalOut/Independent_Fits/GDDThreshold/WithMice/WindowLoop"
 model <- c("GreenControl_GDDSwitch_Low_Mice_AllChains.RData",
            "HenryControl_GDDSwitch_Low_Mice_AllChains.RData",
            "TeaControl_GDDSwitch_Low_Mice_AllChains.RData")
@@ -64,8 +69,8 @@ model <- c("GreenControl_GDDSwitch_Low_Mice_AllChains.RData",
 mice <- list()
 for(i in 1:3){
   load(file.path(dir, model[i]))
-  out$params <- window(out$params, 2500)
-  mice[[i]] <- out$params[-c(2,5)]
+  # out$params <- window(out$params, 2500)
+  mice[[i]] <- out$params
   print(model[i])
   # print(summary(out$params))
   rm(out)
