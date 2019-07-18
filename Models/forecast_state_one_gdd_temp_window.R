@@ -23,7 +23,6 @@ forecast_state_one_gdd_temp_window <- function(type, site, params, ic, N_est, df
   N_days <- dt.index[length(dt.index)]
   
   # get temperature data
-  source("Functions/Future_Met.R")
   met.hind <- future_met(site, 10)
   gdd <- met.hind$cum.gdd[1:N_days]
   met.x <- met.hind$temp.scale[1:N_days]
