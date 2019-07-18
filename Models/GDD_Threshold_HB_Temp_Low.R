@@ -123,7 +123,7 @@ run_model <- function(n.adapt,n.chains){
   for(s in 1:3){
     for(t in 1:N_days[s]){   # loop over every day in time series
     
-      theta.21[s,t] <- ifelse((gdd[s,t] >= 500) && (gdd[s,t] <= 2000),grow.ln.mu,0)
+      theta.21[s,t] <- ifelse(gdd[s,t] >= 500,grow.ln.mu,0)
       theta.32[s,t] <- ifelse((gdd[s,t] <= 750) || (gdd[s,t] >= 2500),grow.na.mu,0)
       
       logit(phi.11[s,t]) <- phi.l.mu + beta.11*met[t,1,s] + alpha.11[s]      
