@@ -1,8 +1,10 @@
-  
-future_met <- function(site, gdd.base){
-  met <- read.csv("../Met_Cary_1995_2008.csv")
-  met <- met[, c("DATE","MAX_TEMP", "MIN_TEMP", "MAX_RH","TOT_PREC")]
+library(lubridate)
 
+future_met <- function(site, gdd.base = 10){
+  met <- read.csv("../Cary_Met_Data_Daily.csv")
+  met <- met[, c("DATE","MAX_TEMP", "MIN_TEMP", "MAX_RH","TOT_PREC")]
+  met$DATE <- as.Date(as.character(met$DATE), format = c("%m/%d/%Y"))
+  
   sites <- c("Green Control","Henry Control","Tea Control")
   N_site <- length(sites)               # number of sites
   raw.dat <- read.csv("../tick_cleaned")   # read in data
@@ -26,7 +28,7 @@ future_met <- function(site, gdd.base){
   
   # index for last day for site being forecasted
   last.index <- which(met$DATE == last.day[s])
-  met.seq <- last.index:nrow(met)
+  met.seq <- last.index:which(met$DATE=="2017-12-31")
   
   met <- met[met.seq,]
   
