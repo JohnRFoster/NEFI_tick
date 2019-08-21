@@ -4,10 +4,8 @@
 #'@param num.chains integer, the number of chains run in parallel
 #'@param num.out integer, the number of succesive files written out (the minimum between chains)
 #'@param thin number of iterations to keep, default 5000
-#'@param save do you want to save the combined chains? defult is no (NULL) 
+#'@param save do you want to save the combined chains? defult is no  
 #'
-
-source('Functions/combine_chains.R')
 
 ammend_chains <- function(dir, num.chains, num.out, thin = 5000, save = FALSE){
   
