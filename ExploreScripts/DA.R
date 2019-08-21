@@ -58,7 +58,7 @@ last.obs <- hist.data$y[,ncol(hist.data$y)]
 ic <- matrix(NA, 3, Nmc)
 for(i in 1:3){
   # create initial condition ensemble members
-  ic[i,] <- rpois(Nmc, last.obs) 
+  ic[i,] <- rpois(Nmc, last.obs[i]) 
 }
 
 ## all days in future sequence
