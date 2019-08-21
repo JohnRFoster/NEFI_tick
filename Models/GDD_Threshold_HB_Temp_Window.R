@@ -36,6 +36,12 @@ run_model <- function(n.adapt,n.chains,met.variable){
   # data <- site_data_met(site = site.run, met.variable = met.variable, data)
   data$R <- diag(1,3,3)
   
+  beta.11 ~ dnorm(0.1142,2104.1999)
+  beta.22 ~ dnorm(-0.05054,383.5644)
+  beta.33 ~ dgamma(0.9,1)
+  
+  data$b11_mu <- c(0.1142, 0.1142)
+  
   inits <- function(){list(x = data$y,
                            repro.mu = rnorm(1, 3, 0.001),
                            phi.l.mu = rnorm(1, 2, 0.001),
@@ -89,9 +95,11 @@ run_model <- function(n.adapt,n.chains,met.variable){
   tau.13 ~ dgamma(0.01,0.01)       # random site effect: reproduction
 
   ### Fixed effects priors
-  beta.11 ~ dnorm(0.1142,2104.1999)
-  beta.22 ~ dnorm(-0.05054,383.5644)
-  beta.33 ~ dgamma(0.9,1)
+  
+  beta.11 ~ dmnorm(b11_mu, b11_prec)
+  beta.22 ~ dmnorm(b22_mu, b22_prec)
+  beta.33 ~ dmnorm(b33_mu, b33_prec)
+ 
 
   ### Missing temp priors
   for(s in 1:3){
@@ -121,9 +129,9 @@ run_model <- function(n.adapt,n.chains,met.variable){
       theta.21[s,t] <- ifelse((gdd[s,t] >= 500) && (gdd[s,t] <= 2000),grow.ln.mu,0)
       theta.32[s,t] <- ifelse((gdd[s,t] <= 750) || (gdd[s,t] >= 2500),grow.na.mu,0)
 
-      logit(phi.11[s,t]) <- phi.l.mu + beta.11*met[t,1,s]      
-      logit(phi.22[s,t]) <- phi.n.mu + beta.22*met[t,1,s] + alpha.22[s]
-      logit(A.day[3,3,s,t]) <- phi.a.mu + beta.33*met[t,1,s] + alpha.33[s]
+      logit(phi.11[s,t]) <- phi.l.mu + beta.11[1]*met[t,1,s] + beta.11[2]*(met[t,1,s]-met[t-1,1,s])      
+      logit(phi.22[s,t]) <- phi.n.mu + beta.22[1]*met[t,1,s] + beta.22[2]*(met[t,1,s]-met[t-1,1,s]) + alpha.22[s]
+      logit(A.day[3,3,s,t]) <- phi.a.mu + beta.33[1]*met[t,1,s] + beta.33[2]*(met[t,1,s]-met[t-1,1,s]) + alpha.33[s]
 
       A.day[1,1,s,t] <- phi.11[s,t]*(1-theta.21[s,t]) 
       A.day[2,1,s,t] <- phi.11[s,t]*theta.21[s,t] 
@@ -166,7 +174,10 @@ run_model <- function(n.adapt,n.chains,met.variable){
     ## TRANS is the aggrigated transition matrix between observations
     
     Ex[1:3,t,s] <- TRANS[1:3,1:3,s,dt.index[s,t]] %*% x[1:3,t,s]
-    x[1:3,t+1,s] ~ dmnorm(Ex[1:3,t,s], SIGMA)
+    p[1:3,t,s] ~ dmnorm(Ex[1:3,t,s], SIGMA)
+    x[1,t+1,s] <- max(p[1,t,s], 0)
+    x[2,t+1,s] <- max(p[2,t,s], 0)
+    x[3,t+1,s] <- max(p[3,t,s], 0)
     
     ## Data Model ##
     
