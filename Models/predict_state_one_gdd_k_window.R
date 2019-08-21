@@ -16,7 +16,7 @@ predict_state_one_gdd_k_window <- function(type, site, params, ic, data, Nmc, dr
   data <- site_data_met(site, met.variable = NULL, data)
   
   N_est <- data$N_est
-  N_days <- data$N_day
+  N_days <- length(data$gdd)
   dt.index <- data$dt.index
   df <- data$df
   gdd <- data$gdd
