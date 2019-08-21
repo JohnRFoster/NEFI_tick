@@ -21,25 +21,17 @@
 
 source("Functions/cary_tick_met_JAGS.R") # get data
 source("Functions/site_data_met.R") # subset data for independent fits
+source("Functions/RunMCMC_Model.R") # run mcmc and check for convergence / burnin
 
-run_model <- function(site.run,n.adapt,n.chains,burnin,thin,n.iter){
-  
-  start.time <- Sys.time()
-  cat("Model Initialized and adapted after\n")
-  print(start.time)
+run_model <- function(site.run, n.adapt, n.chains){
   
   data <- cary_ticks_met_JAGS()
   
   # subset data to site.run and met variable of interest
   data <- site_data_met(site = site.run, met.variable = "temp", data)
   data$R <- diag(1,3,3)
-  # data$b0 <- as.vector(c(0,0))      ## regression beta means
-  # data$Vb <- solve(diag(100,2))   ## regression beta precision
-  # data$gdd <- as.vector(scale(data$gdd))
-  # data$year.index <- rep(cumsum(table(data$year)), table(data$year))
   
-  
-  inits <- function(){list(x = data$y,
+  inits <- function(){list(p = data$y[,-1],
                            repro.mu = rnorm(1, 3, 0.001),
                            phi.l.mu = rnorm(1, 2, 0.001),
                            phi.n.mu = rnorm(1, 4, 0.001),
@@ -62,6 +54,12 @@ run_model <- function(site.run,n.adapt,n.chains,burnin,thin,n.iter){
                "beta.11",
                "beta.22",
                "beta.33",
+               "k.21.low",
+               "k.21.high",
+               "k.32.low",
+               "k.32.high",
+               "k.13.low",
+               "k.13.high",
                "theta.larvae",
                "theta.nymph",
                "theta.adult")
@@ -83,6 +81,12 @@ run_model <- function(site.run,n.adapt,n.chains,burnin,thin,n.iter){
   beta.11 ~ dnorm(0.1142,2104.1999)
   beta.22 ~ dnorm(-0.05054,383.5644)
   beta.33 ~ dgamma(0.9,1)
+  k.21.low  ~  dnorm(500,0.001) T(0,)
+  k.21.high ~ dnorm(2500,0.001) T(0,)
+  k.32.low  ~  dnorm(1000,0.001) T(0,)
+  k.32.high ~ dnorm(2500,0.001) T(0,)
+  k.13.low  ~  dnorm(1500,0.001) T(0,)
+  k.13.high ~ dnorm(2500,0.001) T(0,)
 
   ## prior probablity we observe ticks by life stage
   theta.larvae ~ dunif(0,1)
@@ -95,7 +99,7 @@ run_model <- function(site.run,n.adapt,n.chains,burnin,thin,n.iter){
   
   ### first latent process 
   for(l in 1:3){
-    x[l, 1] ~ dpois(2) 
+    x[l, 1] ~ dpois(10) 
   } # l
   
   ### define parameters
@@ -106,16 +110,17 @@ run_model <- function(site.run,n.adapt,n.chains,burnin,thin,n.iter){
 
     logit(phi.11[t]) <- phi.l.mu + beta.11*met[t]
     logit(phi.22[t]) <- phi.n.mu + beta.22*met[t]
-    theta.21[t] <- ifelse((gdd[t] >= 500),grow.ln.mu,0)
-    # theta.21[t] <- ifelse((gdd[t] >= 500) && (gdd[t] <= 2000),grow.ln.mu,0)
-    theta.32[t] <- ifelse((gdd[t] <= 750) || (gdd[t] >= 2500),grow.na.mu,0)
+    
+    theta.21[t] <- ifelse((gdd[t] >= k.21.low) && (gdd[t] <= k.21.high),grow.ln.mu,0)
+    theta.32[t] <- ifelse((gdd[t] <= k.32.high) || (gdd[t] >= k.32.low),grow.na.mu,0)
+    log(lambda[t]) <- ifelse((gdd[t] >= k.13.low) && (gdd[t] <= k.13.high),repro.mu,0)
 
     A.day[1,1,t] <- phi.11[t]*(1-theta.21[t]) 
     A.day[2,1,t] <- phi.11[t]*theta.21[t] 
     A.day[2,2,t] <- phi.22[t]*(1-theta.32[t]) 
     A.day[3,2,t] <- phi.22[t]*theta.32[t]
     logit(A.day[3,3,t]) <- phi.a.mu + beta.33*met[t]
-    log(A.day[1,3,t]) <- repro.mu
+    A.day[1,3,t] <- lambda[t]
     A.day[1,2,t] <- 0
     A.day[2,3,t] <- 0
     A.day[3,1,t] <- 0
@@ -146,7 +151,10 @@ run_model <- function(site.run,n.adapt,n.chains,burnin,thin,n.iter){
   Ex[1:3,t] <- TRANS[1:3,1:3,dt.index[t]] %*% x[1:3,t]
 
   # process error
-  x[1:3,t+1] ~ dmnorm(Ex[1:3,t], SIGMA)
+  p[1:3,t] ~ dmnorm(Ex[1:3,t], SIGMA)
+  x[1,t+1] <- max(p[1,t], 0)
+  x[2,t+1] <- max(p[2,t], 0)
+  x[3,t+1] <- max(p[3,t], 0)
   
   ### Data Model ###
   
@@ -171,6 +179,10 @@ run_model <- function(site.run,n.adapt,n.chains,burnin,thin,n.iter){
   load.module("glm")
   load.module("dic")
   
+  start.time <- Sys.time()
+  
+  cat("\nCompiling model with", n.adapt, "adaptation iterations \n")
+
   j.model <- jags.model(file = textConnection(model),
                         data = data,
                         inits = inits,
@@ -181,11 +193,7 @@ run_model <- function(site.run,n.adapt,n.chains,burnin,thin,n.iter){
   cat("Model Initialized and adapted after\n")
   print(time)
   
-  jags.out <- coda.samples(model = j.model,
-                           variable.names = monitor,
-                           burnin = burnin,
-                           thin = thin,
-                           n.iter = n.iter)
+  jags.out <- runMCMC_Model(j.model, variableNames = monitor)
   
   time <- Sys.time() - start.time 
   cat(n.iter,"iterations complete after\n")
