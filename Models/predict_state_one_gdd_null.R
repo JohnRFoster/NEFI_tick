@@ -24,7 +24,7 @@ library(boot)
 
 # source("Functions/site_data_met.R")
 
-predict_state_one_gdd_null <- function(type, thresh, site, params, ic, data, Nmc, draw){
+predict_state_one_gdd_null <- function(type, site, params, ic, data, Nmc, draw){
   
   data <- site_data_met(site,met.variable=NULL,data)
   
@@ -94,13 +94,9 @@ predict_state_one_gdd_null <- function(type, thresh, site, params, ic, data, Nmc
     
     phi.11 <- inv.logit(phi.l.mu[m])
     phi.22 <- inv.logit(phi.n.mu[m])
-    theta.32 <- ifelse((gdd <= 750) | (gdd >= 2500),grow.na.mu[m],0)
-   
-    if(thresh == "low"){
-      theta.21 <- ifelse((gdd >= 500),grow.ln.mu[m],0)   
-    } else {
-      theta.21 <- ifelse((gdd >= 500) & (gdd <= 2000),grow.ln.mu[m],0)  
-    }
+    lambda <- ifelse(gdd >= 1500 & gdd <= 2500, repro.mu[m], 0)
+    theta.32 <- ifelse(gdd <= 1000 | gdd >= 2500, inv.logit(grow.na.mu[m]), 0)
+    theta.21 <- ifelse(gdd >= 500 & gdd <= 2500, inv.logit(grow.ln.mu[m]), 0)  
     
     # draw transition matrix
     A[1,1,] <- phi.11*(1-theta.21)
@@ -108,7 +104,7 @@ predict_state_one_gdd_null <- function(type, thresh, site, params, ic, data, Nmc
     A[2,2,] <- phi.22*(1-theta.32)
     A[3,2,] <- phi.22*theta.32
     A[3,3,] <- inv.logit(phi.a.mu[m])
-    A[1,3,] <- exp(repro.mu[m])
+    A[1,3,] <- lambda
     
     ## aggrigate transition matricies
     for(t in 1:(N_est-1)){                 # loop over the number of sampling days - 1
