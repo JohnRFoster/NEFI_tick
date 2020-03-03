@@ -35,9 +35,9 @@ surv_type_DAYMET <- function(file, subset, season = NULL){
   N_Days <- as.numeric(difftime(dat$Date_Retrieved, dat$Date_Deployed))
   
   # read in NOAA data
-  met.cl <- read.csv("CampLejune_DAYMET.csv")
-  met.fd <- read.csv("FortDrum_DAYMET.csv")
-  met.wp <- read.csv("WestPoint_DAYMET.csv")
+  met.cl <- read.csv("../CampLejune_DAYMET.csv")
+  met.fd <- read.csv("../FortDrum_DAYMET.csv")
+  met.wp <- read.csv("../WestPoint_DAYMET.csv")
   
   # set rownames to date
   row.names(met.cl) <- met.cl[,2]
