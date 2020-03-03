@@ -1,4 +1,3 @@
-library(fosteR)
 library(mvtnorm)
 library(ecoforecastR)
 library(boot)
@@ -6,98 +5,196 @@ library(boot)
 source("Functions/Future_Met.R")
 source("Functions/life_stage_ci.R")
 
-data <- cary_ticks_met_JAGS(c("Green Control", "Henry Control", "Tea Control"))
+source("Models/predict_state_one_gdd_K_set_independent.R")
+source("Models/forecast_state_one_gdd_K_set_independent.R")
+source("Functions/ammend_chains.R")
+source("Functions/cary_tick_met_JAGS.R")
 
-load("/projectnb/dietzelab/fosterj/FinalOut/HB_Partial_Temp/Out_Temp_Partial_HB.RData")
 
-params <- window(params, start = 3000)
-predict <- window(predict, start = 3000)
+# dir <- "../FinalOut/HB_Partial_GDD/Temp/LowLoop/GDDSwitch_Low_Temp"
+# dir <- "../FinalOut/HB_Partial_GDD/K_estimate/WindowLoop_4alpha/GDDSwitch_K_Window4alpha"
+# 
+# out <- ammend_chains(dir, 5, 24, save = TRUE)
 
-params.mat <- as.matrix(params)
-ic.mat <- as.matrix(predict)
+load("../FinalOut/Independent_Fits/GDDThreshold/K_all/K_set_multivariate/Green_normTransition/Combined_thinMat_K_set_GreenControl.RData")
+
+data <- cary_ticks_met_JAGS()
+
+params <- as.matrix(out.test$params)
+ic <- as.matrix(out.test$predict)
 n.iter <- nrow(params.mat)
 
-Nmc <- 800 
+Nmc <- 250 
 draw <- sample.int(nrow(params.mat), Nmc)
 N_est <- 40
-df <- 21
-threshold <- c(1500,500,2500)
+df <- 16
+site <- "Green Control"
 
-source("Functions/forecast_with_molting_temp.R")
-source("Functions/predict_state_one_temp.R")
+# pred.D <- predict_state_one_gdd_k_window("deterministic",
+#                                      site,
+#                                      params,
+#                                      ic,
+#                                      data,
+#                                      1,1)
+# 
+# forecast.D <- forecast_state_one_gdd_k_window("deterministic",
+#                                       site,
+#                                       params,
+#                                       ic,
+#                                       N_est,
+#                                       df,
+#                                       1,1)
+# 
+days <- 72+N_est
+
+param.col <- "gray30"
+param.ic.col <- "honeydew4"
+param.ic.drive.col <- "honeydew3"
+param.ic.drive.process.col <- "honeydew2"
+# 
+# ### Parameter Unertainty ###
+# 
+# predict.param <- predict_state_one_gdd_k_window("parameter",
+#                                             site,
+#                                             params,
+#                                             ic,
+#                                             data,
+#                                             Nmc,draw)
+# 
+# forecast.param <- forecast_state_one_gdd_k_window("parameter",
+#                                           site,
+#                                           params,
+#                                           ic,
+#                                           N_est,
+#                                           df,
+#                                           Nmc,draw)
+# 
+# predict.95ci.P <- life.stage.ci(predict.param,"predict")
+# forecast.95ci.P <- life.stage.ci(forecast.param,"predict")
+# 
+# time.1 <- 1:ncol(predict.95ci.P[[1]])
+# time.2 <- (ncol(predict.95ci.P[[1]])+1):(days-1)
+# time.all <- 1:(days-1)
+# 
+# plot(time.all,pch="",ylim=c(0,2000),main="Larvae")
+# ciEnvelope(time.1,predict.95ci.P[[1]][1,],predict.95ci.P[[1]][3,],col=param.col)
+# ciEnvelope(time.2,forecast.95ci.P[[1]][1,],forecast.95ci.P[[1]][3,],col=param.col)
+# lines(time.1,predict.95ci.P[[1]][2,])
+# lines(time.2,forecast.95ci.P[[1]][2,])
+# 
+# plot(time.all,pch="",ylim=c(0,100),main="Nymph")
+# ciEnvelope(time.1,predict.95ci.P[[2]][1,],predict.95ci.P[[2]][3,],col=param.col)
+# ciEnvelope(time.2,forecast.95ci.P[[2]][1,],forecast.95ci.P[[2]][3,],col=param.col)
+# lines(time.1,predict.95ci.P[[2]][2,])
+# lines(time.2,forecast.95ci.P[[2]][2,])
+# 
+# plot(time.all,pch="",ylim=c(0,40),main="Adult")
+# ciEnvelope(time.1,predict.95ci.P[[3]][1,],predict.95ci.P[[3]][3,],col=param.col)
+# ciEnvelope(time.2,forecast.95ci.P[[3]][1,],forecast.95ci.P[[3]][3,],col=param.col)
+# lines(time.1,predict.95ci.P[[3]][2,])
+# lines(time.2,forecast.95ci.P[[3]][2,])
+# 
+# 
+# ### Parameter + Initial Condition Unertainty ###
+# type <- c("parameter","ic")
+# 
+# predict.ic.param <- predict_state_one_gdd_k_window(type,
+#                                                site,
+#                                                params,
+#                                                ic,
+#                                                data,
+#                                                Nmc,draw)
+# 
+# forecast.ic.param <- forecast_state_one_gdd_k_window(type,
+#                                              site,
+#                                              params,
+#                                              ic,
+#                                              N_est,
+#                                              df,
+#                                              Nmc,draw)
+# 
+# predict.95ci.P.IC <- life.stage.ci(predict.ic.param,"predict")
+# forecast.95ci.P.IC <- life.stage.ci(forecast.ic.param,"predict")
+# 
+# plot(time.all,pch="",ylim=c(0,2000),main="Larvae")
+# ciEnvelope(time.1,predict.95ci.P.IC[[1]][1,],predict.95ci.P.IC[[1]][3,],col=param.ic.col)
+# ciEnvelope(time.2,forecast.95ci.P.IC[[1]][1,],forecast.95ci.P.IC[[1]][3,],col=param.ic.col)
+# ciEnvelope(time.1,predict.95ci.P[[1]][1,],predict.95ci.P[[1]][3,],col=param.col)
+# ciEnvelope(time.2,forecast.95ci.P[[1]][1,],forecast.95ci.P[[1]][3,],col=param.col)
+# lines(time.1,predict.95ci.P.IC[[1]][2,])
+# lines(time.2,forecast.95ci.P.IC[[1]][2,])
+# 
+# plot(time.all,pch="",ylim=c(0,100),main="Nymph")
+# ciEnvelope(time.1,predict.95ci.P.IC[[2]][1,],predict.95ci.P.IC[[2]][3,],col=param.ic.col)
+# ciEnvelope(time.2,forecast.95ci.P.IC[[2]][1,],forecast.95ci.P.IC[[2]][3,],col=param.ic.col)
+# ciEnvelope(time.1,predict.95ci.P[[2]][1,],predict.95ci.P[[2]][3,],col=param.col)
+# ciEnvelope(time.2,forecast.95ci.P[[2]][1,],forecast.95ci.P[[2]][3,],col=param.col)
+# lines(time.1,predict.95ci.P.IC[[2]][2,])
+# lines(time.2,forecast.95ci.P[[2]][2,])
+# 
+# plot(time.all,pch="",ylim=c(0,40),main="Adult")
+# ciEnvelope(time.1,predict.95ci.P.IC[[3]][1,],predict.95ci.P.IC[[3]][3,],col=param.ic.col)
+# ciEnvelope(time.2,forecast.95ci.P.IC[[3]][1,],forecast.95ci.P.IC[[3]][3,],col=param.ic.col)
+# ciEnvelope(time.1,predict.95ci.P[[3]][1,],predict.95ci.P[[3]][3,],col=param.col)
+# ciEnvelope(time.2,forecast.95ci.P[[3]][1,],forecast.95ci.P[[3]][3,],col=param.col)
+# lines(time.1,predict.95ci.P.IC[[3]][2,])
+# lines(time.2,forecast.95ci.P.IC[[3]][2,])
 
 
+### Process + Parameter + Initial Condition Unertainty ###
+type <- c("process","parameter","ic")
 
+predict.ic.param.proc <- predict_state_one_gdd_K_set_independent(type,
+                                                    site,
+                                                    params.mat,
+                                                    predict.mat,
+                                                    data,
+                                                    Nmc,draw)
 
+forecast.ic.param.proc <- forecast_state_one_gdd_K_set_independent(type,
+                                                  site,
+                                                  params.mat,
+                                                  predict.mat,
+                                                  N_est,
+                                                  df,
+                                                  Nmc,draw)
 
-# Parameter + IC + Process Uncertainty
-predict.P.IC.PROC <- predict_state_one_temp(type = c("parameter", "ic", "process"),
-                                                 site = "Henry Control",
-                                                 params = params.mat,
-                                                 ic = ic.mat,
-                                                 data = data,
-                                                 Nmc = Nmc,
-                                                 draw = draw)
+predict.95ci.Proc.P.IC <- life.stage.ci(predict.ic.param.proc,"predict")
+forecast.95ci.Proc.P.IC <- life.stage.ci(forecast.ic.param.proc,"predict")
 
-forecast.P.IC.PROC <- forecast_with_molting_temp(type = c("parameter", "ic", "process"),
-                                             site = "Henry Control",
-                                             params = params.mat,
-                                             ic = ic.mat,
-                                             N_est = N_est,
-                                             df = df,
-                                             threshold = threshold,
-                                             Nmc = Nmc,
-                                             draw = draw)
+time.1 <- 1:ncol(predict.95ci.Proc.P.IC[[1]])
+time.2 <- time.1[length(time.1)] + 1:ncol(forecast.95ci.Proc.P.IC[[1]])
+time.all <- 1:time.2[length(time.2)]
 
-CI.P.IC.PROC.pred <- life.stage.ci(predict.P.IC.PROC, type = "predict")
-CI.P.IC.PROC.forecast <- life.stage.ci(forecast.P.IC.PROC, type = "forecast")
+plot(time.all,pch="",ylim=c(0,2000),main="Larvae")
+ciEnvelope(time.1,predict.95ci.Proc.P.IC[[1]][1,],predict.95ci.Proc.P.IC[[1]][3,],col=param.ic.drive.process.col)
+ciEnvelope(time.2,forecast.95ci.Proc.P.IC[[1]][1,],forecast.95ci.Proc.P.IC[[1]][3,],col=param.ic.drive.process.col)
+# ciEnvelope(time.1,predict.95ci.P.IC[[1]][1,],predict.95ci.P.IC[[1]][3,],col=param.ic.col)
+# ciEnvelope(time.2,forecast.95ci.P.IC[[1]][1,],forecast.95ci.P.IC[[1]][3,],col=param.ic.col)
+# ciEnvelope(time.1,predict.95ci.P[[1]][1,],predict.95ci.P[[1]][3,],col=param.col)
+# ciEnvelope(time.2,forecast.95ci.P[[1]][1,],forecast.95ci.P[[1]][3,],col=param.col)
+lines(time.1,predict.95ci.P.IC[[1]][2,])
+lines(time.2,forecast.95ci.P.IC[[1]][2,])
+lines(time.2,forecast.95ci.Proc.P.IC[[1]][2,], col = 2)
 
-plot(1:N_est, CI.P$Larvae[2,], type = "l", xaxt = "n", main = "Larvae", ylim = c(0, 1000))
-ciEnvelope(1:N_est, CI.P.IC.PROC$Larvae[1,], CI.P.IC.PROC$Larvae[3,], col = "grey")
-ciEnvelope(1:N_est, CI.P.IC$Larvae[1,], CI.P.IC$Larvae[3,], col = "lightgreen")
-ciEnvelope(1:N_est, CI.P$Larvae[1,], CI.P$Larvae[3,], col = "purple")
-lines(1:N_est, CI.P$Larvae[2,])
-axis(1, at = at, labels = ym.seq[at])
+plot(time.all,pch="",ylim=c(0,250),main="Nymph")
+ciEnvelope(time.1,predict.95ci.Proc.P.IC[[2]][1,],predict.95ci.Proc.P.IC[[2]][3,],col=param.ic.drive.process.col)
+ciEnvelope(time.2,forecast.95ci.Proc.P.IC[[2]][1,],forecast.95ci.Proc.P.IC[[2]][3,],col=param.ic.drive.process.col)
+# ciEnvelope(time.1,predict.95ci.P.IC[[2]][1,],predict.95ci.P.IC[[2]][3,],col=param.ic.col)
+# ciEnvelope(time.2,forecast.95ci.P.IC[[2]][1,],forecast.95ci.P.IC[[2]][3,],col=param.ic.col)
+# ciEnvelope(time.1,predict.95ci.P[[2]][1,],predict.95ci.P[[2]][3,],col=param.col)
+# ciEnvelope(time.2,forecast.95ci.P[[2]][1,],forecast.95ci.P[[2]][3,],col=param.col)
+lines(time.1,predict.95ci.Proc.P.IC[[2]][2,])
+# lines(time.2,forecast.95ci.P[[2]][2,])
+lines(time.2,forecast.95ci.Proc.P.IC[[2]][2,], col = 2)
 
-plot(1:N_est, CI.P$Nymph[2,], type = "l", xaxt = "n", main = "Nymph", ylim = c(0,150))
-ciEnvelope(1:N_est, CI.P.IC.PROC$Nymph[1,], CI.P.IC.PROC$Nymph[3,], col = "grey")
-ciEnvelope(1:N_est, CI.P.IC$Nymph[1,], CI.P.IC$Nymph[3,], col = "lightgreen")
-ciEnvelope(1:N_est, CI.P$Nymph[1,], CI.P$Nymph[3,], col = "purple")
-lines(1:N_est, CI.P$Nymph[2,])
-axis(1, at = at, labels = ym.seq[at])
-
-plot(1:N_est, CI.P$Adult[2,], type = "l", xaxt = "n", main = "Adult", ylim = c(0,60))
-ciEnvelope(1:N_est, CI.P.IC.PROC$Adult[1,], CI.P.IC.PROC$Adult[3,], col = "grey")
-ciEnvelope(1:N_est, CI.P.IC$Adult[1,], CI.P.IC$Adult[3,], col = "lightgreen")
-ciEnvelope(1:N_est, CI.P$Adult[1,], CI.P$Adult[3,], col = "purple")
-lines(1:N_est, CI.P$Adult[2,])
-axis(1, at = at, labels = ym.seq[at])
-
-
-# Process Uncertainty
-pred.PROC <- forecast_with_molting_temp(type = "process",
-                                        site = "Henry Control",
-                                        params = params.mat,
-                                        ic = ic.mat,
-                                        N_est = N_est,
-                                        df = df,
-                                        threshold = threshold,
-                                        Nmc = Nmc,
-                                        draw = draw)
-
-CI.PROC <- life.stage.ci(pred.PROC)
-
-plot(1:N_est, CI.PROC$Larvae[2,], type = "l", xaxt = "n", main = "Larvae", ylim = c(0, 2000))
-ciEnvelope(1:N_est, CI.PROC$Larvae[1,], CI.PROC$Larvae[3,], col = "grey")
-lines(1:N_est, CI.PROC$Larvae[2,])
-axis(1, at = at, labels = ym.seq[at])
-
-plot(1:N_est, CI.PROC$Nymph[2,], type = "l", xaxt = "n", main = "Nymph", ylim = c(0,150))
-ciEnvelope(1:N_est, CI.PROC$Nymph[1,], CI.PROC$Nymph[3,], col = "grey")
-lines(1:N_est, CI.PROC$Nymph[2,])
-axis(1, at = at, labels = ym.seq[at])
-
-plot(1:N_est, CI.PROC$Adult[2,], type = "l", xaxt = "n", main = "Adult", ylim = c(0,50))
-ciEnvelope(1:N_est, CI.PROC$Adult[1,], CI.PROC$Adult[3,], col = "grey")
-lines(1:N_est, CI.PROC$Adult[2,])
-axis(1, at = at, labels = ym.seq[at])
+plot(time.all,pch="",ylim=c(0,40),main="Adult")
+ciEnvelope(time.1,predict.95ci.Proc.P.IC[[3]][1,],predict.95ci.Proc.P.IC[[3]][3,],col=param.ic.drive.process.col)
+ciEnvelope(time.2,forecast.95ci.Proc.P.IC[[3]][1,],forecast.95ci.Proc.P.IC[[3]][3,],col=param.ic.drive.process.col)
+ciEnvelope(time.1,predict.95ci.P.IC[[3]][1,],predict.95ci.P.IC[[3]][3,],col=param.ic.col)
+ciEnvelope(time.2,forecast.95ci.P.IC[[3]][1,],forecast.95ci.P.IC[[3]][3,],col=param.ic.col)
+ciEnvelope(time.1,predict.95ci.P[[3]][1,],predict.95ci.P[[3]][3,],col=param.col)
+ciEnvelope(time.2,forecast.95ci.P[[3]][1,],forecast.95ci.P[[3]][3,],col=param.col)
+lines(time.1,predict.95ci.P.IC[[3]][2,])
+lines(time.2,forecast.95ci.P.IC[[3]][2,])
+lines(time.2,forecast.95ci.Proc.P.IC[[3]][2,], col = 2)
