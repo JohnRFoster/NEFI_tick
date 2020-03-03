@@ -15,7 +15,7 @@ plot_site_posteriors <- function(all.params, n.site = 3){
   all.params <- as.data.frame(all.params)
   
   n.iter <- nrow(all.params)/n.site
-  site <- factor(rep(1:3, each = n.iter))
+  site <- factor(rep(1:n.site, each = n.iter))
   
   p <- list()
   for(i in 1:ncol(all.params)){
