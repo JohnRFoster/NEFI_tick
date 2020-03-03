@@ -9,184 +9,119 @@ library(grid)
 library(gridExtra)
 library(boot)
 
-source("Functions/predict_state_one_null.R")
-source("Functions/predict_state_one_precip.R")
-source("Functions/gg_data_ci_partition.R")
+source("Functions/Future_Met.R")
+source("Functions/life_stage_ci.R")
 source("Functions/model_performance_metrics.R")
+source("Functions/ammend_chains.R")
+source("Functions/cary_tick_met_JAGS.R")
+source("Functions/plot_post_prior.R")
+source("Functions/site_data_met.R")
+source("Functions/gg_data_ci_partition.R")
+source("Models/predict_one_gdd_metProc_beta_1_ind.R")
 
-life.stage.ci <- function(pred, quants = c(0.025, 0.5, 0.975)){
-  time <- 1:(length(pred[1,,1])-1)
-  ci <- list()
-  larv <- pred[1,,]
-  ci[[1]] <- apply(larv[time,], 1, quantile, quants)
-  
-  nymph <- pred[2,,]
-  ci[[2]] <- apply(nymph[time,], 1, quantile, quants)
-  
-  adult <- pred[3,,]
-  ci[[3]] <- apply(adult[time,], 1, quantile, quants)
-  
-  names(ci) <- c("Larvae","Nymph","Adult")
-  return(ci)
-}
+dir <- "../FinalOut/Independent_Fits/GDDThreshold/RH_ObsProc/beta_111"
+met.variable <- "max rh"
 
-load("/projectnb/dietzelab/fosterj/FinalOut/HB_Partial_Precip/Out_Precip_Partial_HB.RData")
-summary(params)[[1]]
-
-params.mat <- as.matrix(params)
-ic.mat <- as.matrix(predict)
-# params <- window(params, start = 3000)
-# predict <- window(predict, start = 3000)
-n.iter <- nrow(params.mat)
-
-Nmc <- 500 
-draw <- sample.int(nrow(params.mat), Nmc)
-
-sites <- c("Green Control","Henry Control","Tea Control")
-data <- cary_ticks_met_JAGS(sites)
-N_days <- data$N_days
-precip <- data$met[,3,]
-nymph.sum <- larv.sum <- data.frame()
-
+params.ls <- predict.ls <- list()
+sites <- c("Green Control", "Henry Control", "Tea Control")
+pattern <- " Control"
 for(i in 1:3){
-  x <- precip[1:N_days[i],i]
-  l.sum <- matrix(NA, Nmc, length(x))
-  n.sum <- matrix(NA, Nmc, length(x))
-  for(t in 1:N_days[i]){
-    l.sum[,t] <- inv.logit(params.mat[draw,"phi.l.mu"] + params.mat[draw,"beta.11"]*x[t]) + inv.logit(params.mat[draw,"grow.ln.mu"])
-    n.sum[,t] <- inv.logit(params.mat[draw,"phi.n.mu"] + params.mat[draw,"beta.22"]*x[t] + params.mat[draw,paste("alpha.22[", i, "]", sep = "")]) + 
-      inv.logit(params.mat[draw,"grow.na.mu"] + params.mat[draw,paste("alpha.32[", i, "]", sep = "")])
-  }
-  larv.sum[i,1] <- length(which(l.sum > 1)) / (Nmc * N_days[i]) * 100
-  larv.sum[i,2] <- max(l.sum)
-  
-  nymph.sum[i,1] <- length(which(n.sum > 1)) / (Nmc * N_days[i]) * 100
-  nymph.sum[i,2] <- max(n.sum)
+  model <- "Combined_thinMat_MaxRH_ObsProc_beta_111_K_set_"
+  site <- sites[i]
+  site.folder <- gsub(pattern, "", site)
+  model <- paste0(model, site.folder, "Control.RData")
+  load(file = file.path(dir, site.folder, model))
+  params.ls[[i]] <- params.mat
+  predict.ls[[i]] <- predict.mat
 }
 
-larv.sum
-nymph.sum
 
-n.sum <- apply(n.sum, 2, quantile, c(0.025,0.5,0.95))
-
-mean(n.sum[2,])
+Nmc <- 250
+draw <- sample.int(nrow(params.ls[[1]]), Nmc, replace = TRUE)
+data <- cary_ticks_met_JAGS()
 
 
 pred.param <- list()
-pred.param$green <- predict_state_one_precip(type = "parameter",
-                                           site = "Green Control",
-                                           params = params.mat,
-                                           ic = ic.mat,
-                                           data = data,
-                                           Nmc = Nmc,
-                                           draw = draw) 
-pred.param$henry <- predict_state_one_precip(type = "parameter",
-                                           site = "Henry Control",
-                                           params = params.mat,
-                                           ic = ic.mat,
-                                           data = data,
-                                           Nmc = Nmc,
-                                           draw = draw) 
-pred.param$tea <- predict_state_one_precip(type = "parameter",
-                                         site = "Tea Control",
-                                         params = params.mat,
-                                         ic = ic.mat,
-                                         data = data,
-                                         Nmc = Nmc,
-                                         draw = draw) 
 conf.int.param <- list()
-conf.int.param$green <- life.stage.ci(pred.param$green)
-conf.int.param$henry <- life.stage.ci(pred.param$henry)
-conf.int.param$tea <- life.stage.ci(pred.param$tea)
+for(i in 1:3){
+  pred.param[[i]] <- predict_one_gdd_metProc_beta_1_ind(type = "parameter",
+                                                         site = sites[i],
+                                                         met.variable = met.variable,
+                                                         params = params.ls[[i]],
+                                                         ic = predict.ls[[i]],
+                                                         data = data,
+                                                         Nmc = Nmc,
+                                                         draw = draw)
+  conf.int.param[[i]] <- life.stage.ci(pred.param[[i]])
+}
+
+pred.ic <- list()
+conf.int.ic <- list()
+for(i in 1:3){
+  pred.ic[[i]] <- predict_one_gdd_metProc_beta_1_ind(type = "ic",
+                                                         site = sites[i],
+                                                         met.variable = met.variable,
+                                                         params = params.ls[[i]],
+                                                         ic = predict.ls[[i]],
+                                                         data = data,
+                                                         Nmc = Nmc,
+                                                         draw = draw)
+  conf.int.ic[[i]] <- life.stage.ci(pred.ic[[i]])
+}
+
 
 # param + IC
-pred.ic.param <- list()
 type <- c("parameter", "ic")
-pred.ic.param$green <- predict_state_one_precip(type = type,
-                                              site = "Green Control",
-                                              params = params.mat,
-                                              ic = ic.mat,
-                                              data = data,
-                                              Nmc = Nmc,
-                                              draw = draw) 
-pred.ic.param$henry <- predict_state_one_precip(type = type,
-                                              site = "Henry Control",
-                                              params = params.mat,
-                                              ic = ic.mat,
-                                              data = data,
-                                              Nmc = Nmc,
-                                              draw = draw) 
-pred.ic.param$tea <- predict_state_one_precip(type = type,
-                                            site = "Tea Control",
-                                            params = params.mat,
-                                            ic = ic.mat,
-                                            data = data,
-                                            Nmc = Nmc,
-                                            draw = draw)
-
+pred.ic.param <- list()
 conf.int.ic.param <- list()
-conf.int.ic.param$green <- life.stage.ci(pred.ic.param$green)
-conf.int.ic.param$henry <- life.stage.ci(pred.ic.param$henry)
-conf.int.ic.param$tea <- life.stage.ci(pred.ic.param$tea)
+for(i in 1:3){
+  pred.ic.param[[i]] <- predict_one_gdd_metProc_beta_1_ind(type = type,
+                                                     site = sites[i],
+                                                     met.variable = met.variable,
+                                                     params = params.ls[[i]],
+                                                     ic = predict.ls[[i]],
+                                                     data = data,
+                                                     Nmc = Nmc,
+                                                     draw = draw)
+  conf.int.ic.param[[i]] <- life.stage.ci(pred.ic.param[[i]])
+}
 
 # param + IC + Process
-pred.ic.param.process <- list()
 type <- c("parameter", "ic", "process")
-pred.ic.param.process$green <- predict_state_one_precip(type = type,
-                                                      site = "Green Control",
-                                                      params = params.mat,
-                                                      ic = ic.mat,
-                                                      data = data,
-                                                      Nmc = Nmc,
-                                                      draw = draw) 
-pred.ic.param.process$henry <- predict_state_one_precip(type = type,
-                                                      site = "Henry Control",
-                                                      params = params.mat,
-                                                      ic = ic.mat,
-                                                      data = data,
-                                                      Nmc = Nmc,
-                                                      draw = draw) 
-pred.ic.param.process$tea <- predict_state_one_precip(type = type,
-                                                    site = "Tea Control",
-                                                    params = params.mat,
-                                                    ic = ic.mat,
-                                                    data = data,
-                                                    Nmc = Nmc,
-                                                    draw = draw)
-
+pred.ic.param.process <- list()
 conf.int.ic.param.process <- list()
-conf.int.ic.param.process$green <- life.stage.ci(pred.ic.param.process$green)
-conf.int.ic.param.process$henry <- life.stage.ci(pred.ic.param.process$henry)
-conf.int.ic.param.process$tea <- life.stage.ci(pred.ic.param.process$tea)
+for(i in 1:3){
+  pred.ic.param.process[[i]] <- predict_one_gdd_metProc_beta_1_ind(type = type,
+                                                           site = sites[i],
+                                                           met.variable = met.variable,
+                                                           params = params.ls[[i]],
+                                                           ic = predict.ls[[i]],
+                                                           data = data,
+                                                           Nmc = Nmc,
+                                                           draw = draw)
+  conf.int.ic.param.process[[i]] <- life.stage.ci(pred.ic.param.process[[i]])
+}
 
-all.uncertainty <- c("ic", "parameter", "process", "random effect")
-pred.all <- list()
-pred.all$green <- predict_state_one_precip(type = all.uncertainty,
-                                         site = "Green Control",
-                                         params = params.mat,
-                                         ic = ic.mat,
-                                         data = data,
-                                         Nmc = Nmc,
-                                         draw = draw) 
-pred.all$henry <- predict_state_one_precip(type = all.uncertainty,
-                                         site = "Henry Control",
-                                         params = params.mat,
-                                         ic = ic.mat,
-                                         data = data,
-                                         Nmc = Nmc,
-                                         draw = draw) 
-pred.all$tea <- predict_state_one_precip(type = all.uncertainty,
-                                       site = "Tea Control",
-                                       params = params.mat,
-                                       ic = ic.mat,
-                                       data = data,
-                                       Nmc = Nmc,
-                                       draw = draw) 
-conf.int.all <- list()
-conf.int.all$green <- life.stage.ci(pred.all$green)
-conf.int.all$henry <- life.stage.ci(pred.all$henry)
-conf.int.all$tea <- life.stage.ci(pred.all$tea)
-
+# all uncertainty
+type <- c("ic", "parameter", "process", "random effect")
+pred.ic.param.process.re <- list()
+conf.int.ic.param.process.re <- list()
+for(i in 1:3){
+  pred.ic.param.process.re[[i]] <- predict_one_gdd_metProc_beta_1_ind(type = type,
+                                                                   site = sites[i],
+                                                                   met.variable = met.variable,
+                                                                   params = params.ls[[i]],
+                                                                   ic = predict.ls[[i]],
+                                                                   data = data,
+                                                                   Nmc = Nmc,
+                                                                   draw = draw)
+  conf.int.ic.param.process.re[[i]] <- life.stage.ci(pred.ic.param.process.re[[i]])
+}
+ls.names <- c("green", "henry", "tea")
+names(conf.int.ic.param) <- ls.names
+names(conf.int.ic) <- ls.names
+names(conf.int.param) <- ls.names
+names(conf.int.ic.param.process) <- ls.names
 
 # Green Control site index for data
 s <- 1 
@@ -197,7 +132,7 @@ obs.nymph <- data$y[2,time.data,s]
 obs.adult <- data$y[3,time.data,s]
 
 gg.data.larv.green <- gg_data_ci_partition(CI.param = conf.int.param$green,
-                                           CI.all = conf.int.all$green,
+                                           CI.all = NULL,
                                            CI.ic.param.proc = conf.int.ic.param.process$green,
                                            CI.ic.param = conf.int.ic.param$green,
                                            life.stage = "Larvae",
@@ -205,7 +140,7 @@ gg.data.larv.green <- gg_data_ci_partition(CI.param = conf.int.param$green,
                                            obs = obs.larva,
                                            median = conf.int.param$green$Larvae[2,])
 gg.data.nymph.green <- gg_data_ci_partition(CI.param = conf.int.param$green,
-                                            CI.all = conf.int.all$green,
+                                            CI.all = NULL,
                                             CI.ic.param.proc = conf.int.ic.param.process$green,
                                             CI.ic.param = conf.int.ic.param$green,
                                             life.stage = "Nymph",
@@ -213,7 +148,7 @@ gg.data.nymph.green <- gg_data_ci_partition(CI.param = conf.int.param$green,
                                             obs = obs.nymph,
                                             median = conf.int.param$green$Nymph[2,])
 gg.data.adult.green <- gg_data_ci_partition(CI.param = conf.int.param$green,
-                                            CI.all = conf.int.all$green,
+                                            CI.all = NULL,
                                             CI.ic.param.proc = conf.int.ic.param.process$green,
                                             CI.ic.param = conf.int.ic.param$green,
                                             life.stage = "Adult",
@@ -247,7 +182,7 @@ obs.nymph <- data$y[2,time.data,s]
 obs.adult <- data$y[3,time.data,s]
 
 gg.data.larv.henry <- gg_data_ci_partition(CI.param = conf.int.param$henry,
-                                           CI.all = conf.int.all$henry,
+                                           CI.all = NULL,
                                            CI.ic.param.proc = conf.int.ic.param.process$henry,
                                            CI.ic.param = conf.int.ic.param$henry,
                                            life.stage = "Larvae",
@@ -255,7 +190,7 @@ gg.data.larv.henry <- gg_data_ci_partition(CI.param = conf.int.param$henry,
                                            obs = obs.larva,
                                            median = conf.int.param$henry$Larvae[2,])
 gg.data.nymph.henry <- gg_data_ci_partition(CI.param = conf.int.param$henry,
-                                            CI.all = conf.int.all$henry,
+                                            CI.all = NULL,
                                             CI.ic.param.proc = conf.int.ic.param.process$henry,
                                             CI.ic.param = conf.int.ic.param$henry,
                                             life.stage = "Nymph",
@@ -263,7 +198,7 @@ gg.data.nymph.henry <- gg_data_ci_partition(CI.param = conf.int.param$henry,
                                             obs = obs.nymph,
                                             median = conf.int.ic.param.process$henry$Nymph[2,])
 gg.data.adult.henry <- gg_data_ci_partition(CI.param = conf.int.param$henry,
-                                            CI.all = conf.int.all$henry,
+                                            CI.all = NULL,
                                             CI.ic.param.proc = conf.int.ic.param.process$henry,
                                             CI.ic.param = conf.int.ic.param$henry,
                                             life.stage = "Adult",
@@ -289,7 +224,7 @@ obs.nymph <- data$y[2,time.data,s]
 obs.adult <- data$y[3,time.data,s]
 
 gg.data.larv.tea <- gg_data_ci_partition(CI.param = conf.int.param$tea,
-                                         CI.all = conf.int.all$tea,
+                                         CI.all = NULL,
                                          CI.ic.param.proc = conf.int.ic.param.process$tea,
                                          CI.ic.param = conf.int.ic.param$tea,
                                          life.stage = "Larvae",
@@ -297,7 +232,7 @@ gg.data.larv.tea <- gg_data_ci_partition(CI.param = conf.int.param$tea,
                                          obs = obs.larva,
                                          median = conf.int.param$tea$Larvae[2,])
 gg.data.nymph.tea <- gg_data_ci_partition(CI.param = conf.int.param$tea,
-                                          CI.all = conf.int.all$tea,
+                                          CI.all = NULL,
                                           CI.ic.param.proc = conf.int.ic.param.process$tea,
                                           CI.ic.param = conf.int.ic.param$tea,
                                           life.stage = "Nymph",
@@ -305,7 +240,7 @@ gg.data.nymph.tea <- gg_data_ci_partition(CI.param = conf.int.param$tea,
                                           obs = obs.nymph,
                                           median = conf.int.param$tea$Nymph[2,])
 gg.data.adult.tea <- gg_data_ci_partition(CI.param = conf.int.param$tea,
-                                          CI.all = conf.int.all$tea,
+                                          CI.all = NULL,
                                           CI.ic.param.proc = conf.int.ic.param.process$tea,
                                           CI.ic.param = conf.int.ic.param$tea,
                                           life.stage = "Adult",
@@ -317,6 +252,15 @@ r.square.tea.nymph <- r_square_one2one(conf.int.ic.param.process$tea$Nymph[2,], 
 r.square.tea.adult <- r_square_one2one(conf.int.ic.param.process$tea$Adult[2,], obs.adult)
 r.square.tea.larva <- r_square_one2one(conf.int.ic.param.process$tea$Larvae[2,], obs.larva)
 
+
+
+rmse <- function(pred, obs){
+  n <- length(pred)
+  rmse <- sqrt((1/n)*((pred - obs)^2))
+  return(rmse)
+}
+
+
 rmse.tea.nymph <- rmse(pred = conf.int.ic.param.process$tea$Nymph[2,], obs = obs.nymph)
 rmse.tea.adult <- rmse(pred = conf.int.ic.param.process$tea$Adult[2,], obs = obs.adult)
 rmse.tea.larvae <- rmse(pred = conf.int.ic.param.process$tea$Larvae[2,], obs = obs.larva)
@@ -325,10 +269,10 @@ plot_uncertainty <- function(data, life.stage){
   ggplot <- ggplot(data, aes(time, median)) +
     
     # null CI
-    geom_ribbon(aes(ymin = ci.all.low, 
-                    ymax = ci.all.high,
-                    fill = "Random Effect + Process + Parameter + IC"),
-                alpha = 0.8) +
+    # geom_ribbon(aes(ymin = ci.all.low, 
+    #                 ymax = ci.all.high,
+    #                 fill = "Random Effect + Process + Parameter + IC"),
+    #             alpha = 0.8) +
     
     geom_ribbon(aes(ymin = ci.ic.param.proc.low, 
                     ymax = ci.ic.param.proc.high,
@@ -365,7 +309,7 @@ plot_uncertainty <- function(data, life.stage){
     
     # themes
     theme_classic() +
-    theme(legend.position = c(0.85, 0.75), # put legent inside plot
+    theme(legend.position = c(0.25, 0.85), # put legent inside plot
           text = element_text(size = 20))  # increase font size 
   return(ggplot)
 }
@@ -377,7 +321,7 @@ plot_uncertainty <- function(data, life.stage){
 # green plots
 
 plot_uncertainty(gg.data.larv.green, "Larvae") + coord_cartesian(ylim = c(0, 2000))
-plot_uncertainty(gg.data.nymph.green, "Nymph") + coord_cartesian(ylim = c(0, 200))
+plot_uncertainty(gg.data.nymph.green, "Nymph") + coord_cartesian(ylim = c(0, 100))
 
 #gg.data.adult.green$median <- conf.int.ic.param.process$green$Adult[2,]
 plot_uncertainty(gg.data.adult.green, "Adult") + coord_cartesian(ylim = c(0, 25))
@@ -389,7 +333,7 @@ plot_uncertainty(gg.data.adult.green, "Adult") + coord_cartesian(ylim = c(0, 25)
 # henry plots
 
 plot_uncertainty(gg.data.larv.henry, "Larvae") + coord_cartesian(ylim = c(0, 2000))
-plot_uncertainty(gg.data.nymph.henry, "Nymph") + coord_cartesian(ylim = c(0, 200))
+plot_uncertainty(gg.data.nymph.henry, "Nymph") + coord_cartesian(ylim = c(0, 100))
 plot_uncertainty(gg.data.adult.henry, "Adult") + coord_cartesian(ylim = c(0, 25)) 
 
 
@@ -399,18 +343,19 @@ plot_uncertainty(gg.data.adult.henry, "Adult") + coord_cartesian(ylim = c(0, 25)
 # Tea plots
 
 plot_uncertainty(gg.data.larv.tea, "Larvae") + coord_cartesian(ylim = c(0, 2000))
-plot_uncertainty(gg.data.nymph.tea, "Nymph") + coord_cartesian(ylim = c(0, 400))
+plot_uncertainty(gg.data.nymph.tea, "Nymph") + coord_cartesian(ylim = c(0, 200))
 plot_uncertainty(gg.data.adult.tea, "Adult") + coord_cartesian(ylim = c(0, 100))
 
 
 ## variance calculations
 var.calc <- function(pred){
   var.param <- list()
-  var.param$green <- apply(pred.param$green, 2, var)
-  var.param$henry <- apply(pred.param$henry, 2, var)
-  var.param$tea <- apply(pred.param$tea, 2, var)
+  var.param$green <- apply(pred[1,,], 1, var)
+  var.param$henry <- apply(pred, 2, var)
+  var.param$tea <- apply(pred, 2, var)
   return(var.param)
 }
+
 var.param <- var.calc(pred.param)
 var.param.ic <- var.calc(pred.ic.param)
 var.param.ic.proc <- var.calc(pred.ic.param.process)
@@ -420,7 +365,28 @@ var.mat <- list(var.green = rbind(var.param$green, var.param.ic$green, var.param
                 var.henry = rbind(var.param$henry, var.param.ic$henry, var.param.ic.proc$henry, var.all$henry),
                 var.tea = rbind(var.param$tea, var.param.ic$tea, var.param.ic.proc$tea, var.all$tea))
 
+var.param <- var.param.ic <- var.param.ic.proc <- list()
+for(ls in 1:3){
+  var.param[[ls]] <- apply(pred.ic[[2]][ls,,], 1, var)
+  var.param.ic[[ls]] <- apply(pred.ic.param[[2]][ls,,], 1, var)
+  var.param.ic.proc[[ls]] <- apply(pred.ic.param.process[[2]][ls,,], 1, var)
+}
+var.mat <- list()
+for(ls in 1:3){
+  var.mat[[ls]] <- rbind(var.param[[ls]], var.param.ic[[ls]], var.param.ic.proc[[ls]])  
+}
+time.1 <- 1:72
+V.pred.rel <- apply(var.mat[[2]],2,function(x) {x/max(x)})
+# V.pred.rel <- apply(V.pred.rel, 2, sort)
+plot(time.1,V.pred.rel[1,],ylim=c(0,1),type='n',main="Relative Variance: In-Sample (Nymph)",ylab="Proportion of Variance",xlab="time")
+ciEnvelope(time.1, rep(0,ncol(V.pred.rel)),V.pred.rel[1,],col="purple")
+ciEnvelope(time.1, V.pred.rel[1,],V.pred.rel[2,],col="lightgreen")
+ciEnvelope(time.1, V.pred.rel[2,],V.pred.rel[3,],col="grey")
 
+
+plot(conf.int.ic.param.process$tea$Nymph[2,], obs.nymph)
+plot(conf.int.ic.param.process$tea$Adult[2,], obs.adult)
+plot(conf.int.ic.param.process$tea$Nymph[2,], obs.nymph)
 
 
 
