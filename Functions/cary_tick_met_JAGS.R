@@ -14,11 +14,18 @@
 #' @examples ## sites = c("Green Control","Henry Control","Tea Control")
 #' @examples cary_ticks_JAGS(sites = sites,state.null = 7)
 
-
-cary_ticks_met_JAGS <- function(state.interval=NULL){
+library(plantecophys)
+cary_ticks_met_JAGS <- function(state.interval=NULL, dir=NULL){
   sites <- c("Green Control","Henry Control","Tea Control")
   N_site <- length(sites)               # number of sites
-  raw.dat <- read.csv("../tick_cleaned")   # read in data
+  if(is.null(dir)){
+    raw.dat <- read.csv("../tick_cleaned")   # read in data  
+    met <- read.csv("../Met_Cary")
+  } else {
+    raw.dat <- read.csv(paste0(dir, "../tick_cleaned"))
+    met <- read.csv(paste0(dir, "../Met_Cary"))
+  }
+  
   raw.dat$DATE <- as.Date(raw.dat$DATE) # convert to date
   
   # storage
@@ -90,8 +97,8 @@ cary_ticks_met_JAGS <- function(state.interval=NULL){
     }
   }
   
-  met <- read.csv("../Met_Cary")
-  met <- met[, c("DATE","MIN_TEMP","MAX_TEMP","MAX_RH","TOT_PREC")]
+  
+  met <- met[, c("DATE","MIN_TEMP","MAX_TEMP","MAX_RH","MIN_RH","TOT_PREC")]
   
   ## cumulative gdd calculation
   met$DATE <- as.Date(met$DATE)
@@ -121,20 +128,12 @@ cary_ticks_met_JAGS <- function(state.interval=NULL){
     gdd.vec <- c(gdd.vec, gdd)
   }
   names(cum.gdd) <- names(year) <- met$DATE
-  # gdd <- year.mat <- matrix(NA,73,3)
-  # for(i in 1:length(sites)){
-  #   subset.cumgdd <- cum.gdd[as.character(samp.dates[[i]])]
-  #   subset.year <- year[as.character(samp.dates[[i]])]
-  #   if(length(subset.cumgdd)<73){
-  #     subset.cumgdd <- c(subset.cumgdd,NA)
-  #     subset.year <- c(subset.year,NA)
-  #   }
-  #   gdd[,i] <- subset.cumgdd
-  #   year.mat[,i] <- subset.year
-  # }
-  
+
   gdd <- matrix(NA, 3, 3767)
+  met$vpd <- RHtoVPD(met$MIN_RH, met$MIN_TEMP)
+  met$MIN_TEMP <- scale(met$MIN_TEMP, scale = FALSE)
   met$MAX_TEMP <- scale(met$MAX_TEMP, scale = FALSE)
+  met$MIN_RH <- scale(met$MIN_RH, scale = FALSE)
   met$MAX_RH <- scale(met$MAX_RH, scale = FALSE)
   met$DATE <- as.Date(met$DATE)
   met.seq <- list()
@@ -147,13 +146,16 @@ cary_ticks_met_JAGS <- function(state.interval=NULL){
     gdd[j,1:length(met.seq[[j]])] <- cum.gdd[met.seq[[j]]]
   }
   
+  
+  
   ## met array
   # dim 1 = days
   # dim 2 = metric(1 = max temp,
   #                2 = max rh,
-  #                3 = precip)
+  #                3 = precip,
+  #                4 = vpd)
   # dim 3 = site
-  met.x <- array(data = NA, dim = c(max(sapply(met.seq,length)),3,3))
+  met.x <- array(data = NA, dim = c(max(sapply(met.seq,length)),4,3))
   for(s in 1:N_site){
     for(t in 1:length(met.seq[[s]])){
       for(i in 2:4){
@@ -163,32 +165,61 @@ cary_ticks_met_JAGS <- function(state.interval=NULL){
     }
   }
   
-  temp.mis <- matrix(NA,length(which(is.na(met[,2]))),3)
-  rh.mis <- matrix(NA,length(which(is.na(met[,3]))),3)
-  for(i in 1:N_site){
-    na <- which(is.na(met.x[1:min(sapply(met.seq,length)),1,i]))
-    for(t in 1:length(na)){
-      temp.mis[t,i] <- na[t]
+  build.met <- function(met.var, met.seq){
+    met.matrix <- matrix(NA, max(sapply(met.seq,length)), 3)
+    for(s in 1:N_site){
+      day.site <- length(met.seq[[s]])
+      met.matrix[1:day.site,s] <- met.var[met.seq[[s]]]
     }
+    return(met.matrix)
   }
-  temp.mis <- temp.mis[complete.cases(temp.mis),]
-  for(i in 1:N_site){
-    na <- which(is.na(met.x[1:min(sapply(met.seq,length)),2,i]))
-    for(t in 1:length(na)){
-      rh.mis[t,i] <- na[t]
-    }
+  
+  vpd.site <- build.met(met$vpd, met.seq)
+  min.temp <- build.met(met$MIN_TEMP, met.seq)
+  max.temp <- build.met(met$MAX_TEMP, met.seq)
+  min.rh <- build.met(met$MIN_RH, met.seq)
+  max.rh <- build.met(met$MAX_RH, met.seq)
+  precip <- build.met(met$TOT_PREC, met.seq)
+  
+  mis.vpd <- matrix(NA, 500, 3)
+  mis.min.temp <- mis.max.temp <- mis.min.rh <- mis.max.rh <- mis.vpd
+  for(s in 1:N_site){
+    mis.vpd[1:length(which(is.na(met$vpd[met.seq[[s]]]))),s] <- which(is.na(met$vpd[met.seq[[s]]]))
+    mis.min.temp[1:length(which(is.na(met$MIN_TEMP[met.seq[[s]]]))),s] <- which(is.na(met$MIN_TEMP[met.seq[[s]]]))
+    mis.max.temp[1:length(which(is.na(met$MAX_TEMP[met.seq[[s]]]))),s] <- which(is.na(met$MAX_TEMP[met.seq[[s]]]))
+    mis.min.rh[1:length(which(is.na(met$MIN_RH[met.seq[[s]]]))),s] <- which(is.na(met$MIN_RH[met.seq[[s]]]))
+    mis.max.rh[1:length(which(is.na(met$MAX_RH[met.seq[[s]]]))),s] <- which(is.na(met$MAX_RH[met.seq[[s]]]))
   }
-  rh.mis <- rh.mis[complete.cases(rh.mis),]
+  
+  disgard <- function(mis.matrix){
+    dis <- which(!complete.cases(mis.matrix))  
+    keep <- mis.matrix[1:(dis[1]-1),]
+    return(keep)
+  }
+  
+  mis.vpd <- disgard(mis.vpd) 
+  mis.min.temp <- disgard(mis.min.temp) 
+  mis.max.temp <- disgard(mis.max.temp) 
+  mis.min.rh <- disgard(mis.min.rh) 
+  mis.max.rh <- disgard(mis.max.rh) 
+  
   data <- list(y = all.tick,
                dt.index = dt.index.mat,
                df = df.mat,
                N_est = N_est,
                N_days = N_days,
-               met = met.x,
-               gdd = gdd,
-               #year = year.mat,
-               temp.mis = temp.mis,
-               rh.mis = rh.mis)
+               temp.min = min.temp,
+               temp.max = max.temp,
+               rh.min = min.rh,
+               rh.max = max.rh,
+               precip = precip,
+               vpd = vpd.site,
+               mis.vpd = mis.vpd,
+               mis.temp.min = mis.min.temp,
+               mis.temp.max = mis.max.temp,
+               mis.rh.min = mis.min.rh,
+               mis.rh.max = mis.max.rh,
+               gdd = gdd)
   
   return(data)
   
