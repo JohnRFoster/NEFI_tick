@@ -78,6 +78,8 @@ cary_ticks_met_JAGS <- function(state.interval=NULL, dir=NULL){
       dt.index.mat[j,t] <- dt.index[[j]][[t]]
   }
   
+  # make indexing work for combining projection matrices
+  df.mat[,1] <- df.mat[,1] - 1
   dt.index.mat <- cbind(rep(1, 3), dt.index.mat)
   
   # all tick array
