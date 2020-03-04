@@ -78,6 +78,8 @@ cary_ticks_met_JAGS <- function(state.interval=NULL, dir=NULL){
       dt.index.mat[j,t] <- dt.index[[j]][[t]]
   }
   
+  dt.index.mat <- cbind(rep(1, 3), dt.index.mat)
+  
   # all tick array
   # dim 1 = life stage (larvae, nymph, adult)
   # dim 2 = date
