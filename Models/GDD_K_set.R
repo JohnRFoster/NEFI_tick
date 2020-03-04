@@ -1,11 +1,10 @@
 ##   This is the model for Cary Ticks on a Daily scale.    
 ##
-##   This model has interactinf parameters in the matrix (phi*(1-psi))
+##   This model has interacting parameters in the matrix (phi*(1-psi))
 ##   
 ##   Transition is a threshold (on if within gdd window, off otherwise)
 ##
-##   Survival in the questing matrix is estimated with the a random intercept, and a 
-##   fixed effect on temperature.        
+##   No Drivers on survival or observation        
 ##                                                                 
 ##   The state is estimated for every sampling day only, 
 ##   but demographic params are estimated daily.                       
