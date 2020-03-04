@@ -69,8 +69,8 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
                "theta.nymph",
                "theta.adult",
                "beta.l.obs",
-               "beta.l.lat")
-               # "beta.l.vert",
+               "beta.l.lat",
+               "beta.l.vert")
                # "beta.n.obs",
                # "beta.n.lat")
                # "beta.n.vert",
@@ -95,7 +95,7 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
   beta.l.obs ~ dnorm(0, 0.001) T(1E-10,)
   # beta.n.obs ~ dnorm(0, 0.001) T(1E-10,)
   # beta.a.obs ~ dnorm(0, 0.001) T(1E-10,)
-  # beta.l.vert ~ dnorm(0, 0.001) T(0,)
+  beta.l.vert ~ dnorm(0, 0.001) T(0,)
   # beta.n.vert ~ dnorm(0, 0.001) T(0,)
   # beta.a.vert ~ dnorm(0, 0.001) T(0,)
   beta.l.lat ~ dnorm(0, 0.001)
@@ -183,7 +183,7 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
   m[3,t] <- x[3,t]*b.adult[t] + 1E-10
   
   ## observation probability based on temperature
-  theta.larva[t] <- 1 / (1 + beta.l.obs*(met.obs[t] + beta.l.lat)^2)
+  theta.larva[t] <- 1 / (1 + beta.l.vert + beta.l.obs*(met.obs[t] + beta.l.lat)^2)
   # theta.nymph[t] <- 1 / (1 + beta.n.obs*(met.obs[t] + beta.n.lat)^2)
   # theta.adult[t] <- 1 / (1 + beta.a.vert + beta.a.obs*(met.obs[t] + beta.a.lat)^2)
   
