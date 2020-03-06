@@ -65,13 +65,13 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
                "grow.na.mu",
                "repro.mu",
                "SIGMA",
-               # "theta.larva",
-               "theta.nymph",
+               "theta.larva",
+               # "theta.nymph",
                "theta.adult",
-               "beta.l.obs",
-               "beta.l.lat",
-               "beta.l.vert")
-               # "beta.n.obs",
+               # "beta.l.obs",
+               # "beta.l.lat",
+               # "beta.l.vert")
+               "beta.n.obs")
                # "beta.n.lat")
                # "beta.n.vert",
                # "beta.a.obs",
@@ -92,17 +92,17 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
   SIGMA ~ dwish(R, 4)         # mvn [3 x 3] site process
   
   ## observation regression priors
-  beta.l.obs ~ dnorm(0, 0.001) T(1E-10,)
-  # beta.n.obs ~ dnorm(0, 0.001) T(1E-10,)
+  # beta.l.obs ~ dnorm(0, 0.001) T(1E-10,)
+  beta.n.obs ~ dnorm(0, 0.001) T(1E-10,)
   # beta.a.obs ~ dnorm(0, 0.001) T(1E-10,)
-  beta.l.vert ~ dnorm(0, 0.001) T(0,)
+  # beta.l.vert ~ dnorm(0, 0.001) T(0,)
   # beta.n.vert ~ dnorm(0, 0.001) T(0,)
   # beta.a.vert ~ dnorm(0, 0.001) T(0,)
-  beta.l.lat ~ dnorm(0, 0.001)
+  # beta.l.lat ~ dnorm(0, 0.001)
   # beta.n.lat ~ dnorm(0, 0.001)
   # beta.a.lat ~ dnorm(0, 0.001)
-  # theta.larva ~ dunif(0,1)
-  theta.nymph ~ dunif(0,1)
+  theta.larva ~ dunif(0,1)
+  # theta.nymph ~ dunif(0,1)
   theta.adult ~ dunif(0,1)
   
   ### first latent process 
@@ -183,13 +183,13 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
   m[3,t] <- x[3,t]*b.adult[t] + 1E-10
   
   ## observation probability based on temperature
-  theta.larva[t] <- 1 / (1 + beta.l.vert + beta.l.obs*(met.obs[t] + beta.l.lat)^2)
-  # theta.nymph[t] <- 1 / (1 + beta.n.obs*(met.obs[t] + beta.n.lat)^2)
+  # theta.larva[t] <- 1 / (1 + beta.l.vert + beta.l.obs*(met.obs[t] + beta.l.lat)^2)
+  theta.nymph[t] <- 1 / (1 + beta.n.obs*(met.obs[t])^2)
   # theta.adult[t] <- 1 / (1 + beta.a.vert + beta.a.obs*(met.obs[t] + beta.a.lat)^2)
   
   ## binary outcome of observation by life stage
-  b.larva[t] ~ dbern(theta.larva[t])
-  b.nymph[t] ~ dbern(theta.nymph)
+  b.larva[t] ~ dbern(theta.larva)
+  b.nymph[t] ~ dbern(theta.nymph[t])
   b.adult[t] ~ dbern(theta.adult)
   
   } # t
