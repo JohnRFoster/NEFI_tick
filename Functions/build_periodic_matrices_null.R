@@ -1,4 +1,8 @@
-build_periodic_matrices_null <- function(params, gdd, N_days){
+build_periodic_matrices_null <- function(params){
+  
+  # pull needed data from list
+  N_days <- data$N_days
+  gdd <- data$gdd[1:N_days]
   
   # storage
   A <- array(0, dim=c(3,3,N_days,nrow(params)))
