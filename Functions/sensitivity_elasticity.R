@@ -1,4 +1,4 @@
-sensitivity_elasticity <- function(A, data){
+sensitivity_elasticity <- function(A, data, Nmc){
   
   N_est <- data$N_est
   N_days <- data$N_day
