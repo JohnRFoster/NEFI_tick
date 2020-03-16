@@ -1,5 +1,5 @@
 
-ua_parts <- function(params, ic){
+ua_parts <- function(params, ic, type){
   ua.parts <- list()
   
   # process error coloumns 
