@@ -17,16 +17,16 @@ source("Functions/cary_tick_met_JAGS.R")
 source("Functions/plot_post_prior.R")
 source("Functions/site_data_met.R")
 source("Functions/gg_data_ci_partition.R")
-source("Models/predict_one_gdd_metProc_beta_1_ind.R")
+source("Models/predict_one_null.R")
 
-dir <- "../FinalOut/Independent_Fits/GDDThreshold/RH_ObsProc/beta_111"
-met.variable <- "max rh"
+dir <- "../FinalOut/A_Correct/NULL/"
+met.variable <- NULL
 
 params.ls <- predict.ls <- list()
 sites <- c("Green Control", "Henry Control", "Tea Control")
 pattern <- " Control"
 for(i in 1:3){
-  model <- "Combined_thinMat_MaxRH_ObsProc_beta_111_K_set_"
+  model <- "Combined_thinMat_NULL_"
   site <- sites[i]
   site.folder <- gsub(pattern, "", site)
   model <- paste0(model, site.folder, "Control.RData")
@@ -36,7 +36,7 @@ for(i in 1:3){
 }
 
 
-Nmc <- 250
+Nmc <- 300
 draw <- sample.int(nrow(params.ls[[1]]), Nmc, replace = TRUE)
 data <- cary_ticks_met_JAGS()
 
@@ -44,29 +44,29 @@ data <- cary_ticks_met_JAGS()
 pred.param <- list()
 conf.int.param <- list()
 for(i in 1:3){
-  pred.param[[i]] <- predict_one_gdd_metProc_beta_1_ind(type = "parameter",
+  pred.param[[i]] <- predict_one_null(type = "parameter",
                                                          site = sites[i],
-                                                         met.variable = met.variable,
+                                                         # met.variable = met.variable,
                                                          params = params.ls[[i]],
                                                          ic = predict.ls[[i]],
                                                          data = data,
                                                          Nmc = Nmc,
                                                          draw = draw)
-  conf.int.param[[i]] <- life.stage.ci(pred.param[[i]])
+  conf.int.param[[i]] <- life.stage.ci(pred.param[[i]][[1]])
 }
 
 pred.ic <- list()
 conf.int.ic <- list()
 for(i in 1:3){
-  pred.ic[[i]] <- predict_one_gdd_metProc_beta_1_ind(type = "ic",
+  pred.ic[[i]] <- predict_one_null(type = "ic",
                                                          site = sites[i],
-                                                         met.variable = met.variable,
+                                                         # met.variable = met.variable,
                                                          params = params.ls[[i]],
                                                          ic = predict.ls[[i]],
                                                          data = data,
                                                          Nmc = Nmc,
                                                          draw = draw)
-  conf.int.ic[[i]] <- life.stage.ci(pred.ic[[i]])
+  conf.int.ic[[i]] <- life.stage.ci(pred.ic[[i]][[1]])
 }
 
 
@@ -75,15 +75,15 @@ type <- c("parameter", "ic")
 pred.ic.param <- list()
 conf.int.ic.param <- list()
 for(i in 1:3){
-  pred.ic.param[[i]] <- predict_one_gdd_metProc_beta_1_ind(type = type,
+  pred.ic.param[[i]] <- predict_one_null(type = type,
                                                      site = sites[i],
-                                                     met.variable = met.variable,
+                                                     # met.variable = met.variable,
                                                      params = params.ls[[i]],
                                                      ic = predict.ls[[i]],
                                                      data = data,
                                                      Nmc = Nmc,
                                                      draw = draw)
-  conf.int.ic.param[[i]] <- life.stage.ci(pred.ic.param[[i]])
+  conf.int.ic.param[[i]] <- life.stage.ci(pred.ic.param[[i]][[1]])
 }
 
 # param + IC + Process
@@ -91,32 +91,32 @@ type <- c("parameter", "ic", "process")
 pred.ic.param.process <- list()
 conf.int.ic.param.process <- list()
 for(i in 1:3){
-  pred.ic.param.process[[i]] <- predict_one_gdd_metProc_beta_1_ind(type = type,
+  pred.ic.param.process[[i]] <- predict_one_null(type = type,
                                                            site = sites[i],
-                                                           met.variable = met.variable,
+                                                           # met.variable = met.variable,
                                                            params = params.ls[[i]],
                                                            ic = predict.ls[[i]],
                                                            data = data,
                                                            Nmc = Nmc,
                                                            draw = draw)
-  conf.int.ic.param.process[[i]] <- life.stage.ci(pred.ic.param.process[[i]])
+  conf.int.ic.param.process[[i]] <- life.stage.ci(pred.ic.param.process[[i]][[1]])
 }
 
 # all uncertainty
-type <- c("ic", "parameter", "process", "random effect")
-pred.ic.param.process.re <- list()
-conf.int.ic.param.process.re <- list()
-for(i in 1:3){
-  pred.ic.param.process.re[[i]] <- predict_one_gdd_metProc_beta_1_ind(type = type,
-                                                                   site = sites[i],
-                                                                   met.variable = met.variable,
-                                                                   params = params.ls[[i]],
-                                                                   ic = predict.ls[[i]],
-                                                                   data = data,
-                                                                   Nmc = Nmc,
-                                                                   draw = draw)
-  conf.int.ic.param.process.re[[i]] <- life.stage.ci(pred.ic.param.process.re[[i]])
-}
+# type <- c("ic", "parameter", "process", "random effect")
+# pred.ic.param.process.re <- list()
+# conf.int.ic.param.process.re <- list()
+# for(i in 1:3){
+#   pred.ic.param.process.re[[i]] <- predict_one_null(type = type,
+#                                                                    site = sites[i],
+#                                                                    met.variable = met.variable,
+#                                                                    params = params.ls[[i]],
+#                                                                    ic = predict.ls[[i]],
+#                                                                    data = data,
+#                                                                    Nmc = Nmc,
+#                                                                    draw = draw)
+#   conf.int.ic.param.process.re[[i]] <- life.stage.ci(pred.ic.param.process.re[[i]][[1]])
+# }
 ls.names <- c("green", "henry", "tea")
 names(conf.int.ic.param) <- ls.names
 names(conf.int.ic) <- ls.names
