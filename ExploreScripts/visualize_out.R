@@ -5,11 +5,11 @@ source("Functions/split_mice.R")
 source("Functions/plot_posterior_chains.R")
 source("Functions/plot_post_prior.R")
 
-dir <- "../FinalOut/HB_Partial_GDD/K_estimate/WindowLoop_4alpha/GDDSwitch_K_Window4alpha"
+dir <- "../FinalOut/HB_Partial_GDD/Mice/WindowLoop/GDDSwitch_Mice_Win"
 num.chains <- 5
-num.out <- 19
+num.out <- 8
 
-out <- ammend_chains(dir, num.chains, num.out, save = "GDDSwitch_K_Window4alpha")
+out <- ammend_chains(dir, num.chains, num.out, save = "GDDSwitch_Mice_Win")
 
 plot(out$params)
 plot_posterior_chains(out$params)
@@ -28,9 +28,10 @@ num.chains <- 5
 num.out <- 2
 
 out <- ammend_chains(dir, num.chains, num.out)
-model <- split_mice(out)
 
+model <- split_mice(out)
 plot(model$params)
+
 plot_posterior_chains(model$params)
 plot_posterior_chains(model$params, c("deviance",
                                       "grow.na.mu",
@@ -61,25 +62,27 @@ lines(time, mice.ci[2,])
 
 
 
-dir <- "../FinalOut/Independent_Fits/GDDThreshold/WithMice/WindowLoop"
-model <- c("GreenControl_GDDSwitch_Low_Mice_AllChains.RData",
-           "HenryControl_GDDSwitch_Low_Mice_AllChains.RData",
-           "TeaControl_GDDSwitch_Low_Mice_AllChains.RData")
+dir <- "../FinalOut/Independent_Fits/GDDThreshold/Temp_Obs_Correct/K_set/LarvaOnly/beta_1/"
+# site.folders <- c("Green", "Henry", "Tea")
+site.folders <- c("Henry", "Tea")
+model <- c(#"Combined_thinMat_Temp_obs_beta_2_K_set_GreenControl.RData",
+           "Combined_thinMat_Obs_LarvaOnly_Beta1_HenryControl.RData",
+           "Combined_thinMat_Obs_LarvaOnly_Beta1_TeaControl.RData")
 
-mice <- list()
-for(i in 1:3){
-  load(file.path(dir, model[i]))
+beta.1 <- list()
+for(i in 1:length(model)){
+  load(file.path(dir, site.folders[i], model[i]))
   # out$params <- window(out$params, 2500)
-  mice[[i]] <- out$params
-  print(model[i])
+  beta.1[[i]] <- params.mat
+  # print(model[i])
   # print(summary(out$params))
-  rm(out)
+  # rm(out)
 }
 
 source("Functions/plot_site_posteriors.R")
 
-all.params <- rbind(as.matrix(mice[[1]]),
-                    as.matrix(mice[[2]]),
-                    as.matrix(mice[[3]]))
+all.params <- rbind(as.matrix(beta.1[[1]]),
+                    as.matrix(beta.1[[2]]))
+                    # as.matrix(beta.1[[3]]))
 
-plot_site_posteriors(all.params[,-c(1:9)])
+plot_site_posteriors(all.params[,-c(1:9)], n.site = 2)
