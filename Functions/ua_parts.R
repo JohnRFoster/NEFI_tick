@@ -1,5 +1,7 @@
 
 ua_parts <- function(params, ic, type){
+  
+  Nmc <- nrow(params)
   ua.parts <- list()
   
   # process error coloumns 
