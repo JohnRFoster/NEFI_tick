@@ -25,7 +25,7 @@ obs_prob <- function(ua, obs.temp = NULL){
   } else {
     for(t in seq_along(obs.temp)){
       if ("beta.n.obs" %in% monitor & !("beta.n.lat" %in% monitor) & !("beta.n.vert" %in% monitor)){
-        theta.nymph <- 1 / (1 + ua$beta.n.obs*obs.temp^2)
+        theta.nymph <- 1 / (1 + ua$beta.n.obs*obs.temp[t]^2)
       } else if ("beta.n.obs" %in% monitor & "beta.n.lat" %in% monitor & !("beta.n.vert" %in% monitor)){
         theta.nymph <- 1 / (1 + ua$beta.n.obs*(ua$beta.n.lat + obs.temp[t])^2)
       } else if ("beta.n.obs" %in% monitor & "beta.n.lat" %in% monitor & "beta.n.vert" %in% monitor){
@@ -40,7 +40,7 @@ obs_prob <- function(ua, obs.temp = NULL){
   } else {
     for(t in seq_along(obs.temp)){
       if ("beta.a.obs" %in% monitor & !("beta.a.lat" %in% monitor) & !("beta.a.vert" %in% monitor)){
-        theta.adult <- 1 / (1 + ua$beta.a.obs*obs.temp^2)
+        theta.adult <- 1 / (1 + ua$beta.a.obs*obs.temp[t]^2)
       } else if ("beta.a.obs" %in% monitor & "beta.a.lat" %in% monitor & !("beta.a.vert" %in% monitor)){
         theta.adult <- 1 / (1 + ua$beta.a.obs*(ua$beta.a.lat + obs.temp[t])^2)
       } else if ("beta.a.obs" %in% monitor & "beta.a.lat" %in% monitor & "beta.a.vert" %in% monitor){
