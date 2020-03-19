@@ -14,7 +14,7 @@ sensitivity_elasticity <- function(A, data){
   }
   
   # Product of phase matrices A excluding matrix at time 0
-  D <- array(0, dim = c(3,3,N_est-1,Nmc))
+  D <- array(0, dim = c(3,3,N_est,Nmc))
   A.agg <- array(0, dim = c(3,3,N_days,Nmc))
   
   for(m in 1:Nmc){
@@ -30,7 +30,7 @@ sensitivity_elasticity <- function(A, data){
   }
   
   # perdioc matrix at sampling events; time 0
-  Bh <- A[,,dt.index[1:(N_est-1)],]
+  Bh <- A[,,dt.index[1:N_est],]
   
   # storage for sensitivity and elasticity matrices
   S.Bh <- E.Bh <- array(0, dim = dim(D))
