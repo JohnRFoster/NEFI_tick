@@ -74,9 +74,9 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
                "beta.n.obs",
                # "beta.n.lat",
                # "beta.n.vert",
-               "beta.a.obs")
+               "beta.a.obs",
                # "beta.a.lat",
-               # "beta.a.vert")
+               "beta.a.vert")
   
   model = " model {
   
@@ -97,7 +97,7 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
   beta.a.obs ~ dnorm(0, 0.001) T(1E-10,)
   # beta.l.vert ~ dnorm(0, 0.001) T(0,)
   # beta.n.vert ~ dnorm(0, 0.001) T(0,)
-  # beta.a.vert ~ dnorm(0, 0.001) T(0,)
+  beta.a.vert ~ dnorm(0, 0.001) T(0,)
   # beta.l.lat ~ dnorm(0, 0.001)
   # beta.n.lat ~ dnorm(0, 0.001)
   # beta.a.lat ~ dnorm(0, 0.001)
@@ -185,7 +185,7 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
   ## observation probability based on temperature
   theta.larva[t] <- 1 / (1 + beta.l.obs*(met.obs[t])^2)
   theta.nymph[t] <- 1 / (1 + beta.n.obs*(met.obs[t])^2)
-  theta.adult[t] <- 1 / (1 + beta.a.obs*(met.obs[t])^2)
+  theta.adult[t] <- 1 / (1 + beta.a.vert + beta.a.obs*(met.obs[t])^2)
   
   ## binary outcome of observation by life stage
   b.larva[t] ~ dbern(theta.larva[t])
