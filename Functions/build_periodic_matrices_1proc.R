@@ -12,7 +12,7 @@ build_periodic_matrices_1proc <- function(ua, data){
   A <- array(0, dim=c(3,3,N_days,Nmc))
 
   # build matrices
-  for(m in seq_along(phi.a.mu)){
+  for(m in seq_along(ua$phi.a.mu)){
   
     phi.11 <- inv.logit(ua$phi.l.mu[m] + ua$beta.11[m]*met)
     phi.22 <- inv.logit(ua$phi.n.mu[m] + ua$beta.22[m]*met)
