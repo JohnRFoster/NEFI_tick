@@ -1,4 +1,5 @@
 library(ecoforecastR)
+library(LaplacesDemon)
 
 source("Functions/site_data_met.R")
 source("Functions/cary_tick_met_JAGS.R")
@@ -9,12 +10,12 @@ data.hb <- cary_ticks_met_JAGS()
 
 site.folders <- c("Green", "Henry", "Tea")
 sites <- c("Green Control", "Henry Control", "Tea Control")
-top.dir <- "../FinalOut/A_Correct/ObsModel/L1.N1.A1/"
+top.dir <- "../FinalOut/A_Correct/NULL/"
 met.variable <- NULL
 
 for(i in 1:3){
   dir <- paste0(top.dir, site.folders[i])
-  model <- paste0("Combined_thinMat_Obs_111_Beta_", site.folders[i], "Control.RData")
+  model <- paste0("Combined_thinMat_NULL_", site.folders[i], "Control.RData")
   load(file.path(dir, model))
   
   cat("Calculating WAIC for", model, "\n")
@@ -31,21 +32,26 @@ for(i in 1:3){
   # storage
   like.l <- like.n <- like.a <- matrix(NA, nrow(predict.mat), N_est)
   
+  # observation probability
+  obs.prob <- obs_prob(ua, N_est, obs.temp)
+  num <- length(ua$deviance)
+  
   for(t in 1:N_est){ # loop over observations
     
-    # observation probability
-    obs.prob <- obs_prob(ua, obs.temp[t])
-    
     # zero inflate latent state
-    num <- length(obs.prob$theta.larva)
-    l <- ua$IC[, paste("x[1,",t, "]",sep="")] * rbinom(num, 1, obs.prob$theta.larva)
-    n <- ua$IC[, paste("x[2,",t, "]",sep="")] * rbinom(num, 1, obs.prob$theta.nymph)
-    a <- ua$IC[, paste("x[3,",t, "]",sep="")] * rbinom(num, 1, obs.prob$theta.adult)
+    l <- ua$IC[, paste("x[1,",t, "]",sep="")]# * rbinom(num, 1, obs.prob$theta.larva[,t])
+    n <- ua$IC[, paste("x[2,",t, "]",sep="")]# * rbinom(num, 1, obs.prob$theta.nymph[,t])
+    a <- ua$IC[, paste("x[3,",t, "]",sep="")]# * rbinom(num, 1, obs.prob$theta.adult[,t])
+    
+    # set zero predictions to 1E-10 (otherwise get NaN in likelihood)
+    l[l==0] <- 1E-10
+    n[n==0] <- 1E-10
+    a[a==0] <- 1E-10
     
     # calculate likelihood
-    like.l[,t] <- dpois(y[1,t], l)
-    like.n[,t] <- dpois(y[2,t], n)
-    like.a[,t] <- dpois(y[3,t], a)
+    like.l[,t] <- dgpois(y[1,t], l, 1-obs.prob$theta.larva[,t])
+    like.n[,t] <- dgpois(y[2,t], n, 1-obs.prob$theta.nymph[,t])
+    like.a[,t] <- dgpois(y[3,t], a, 1-obs.prob$theta.adult[,t])
   }
   
   like <- cbind(like.l, like.n, like.n)
