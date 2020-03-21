@@ -10,12 +10,13 @@ data.hb <- cary_ticks_met_JAGS()
 
 site.folders <- c("Green", "Henry", "Tea")
 sites <- c("Green Control", "Henry Control", "Tea Control")
-top.dir <- "../FinalOut/A_Correct/NULL/"
+top.dir <- "../FinalOut/A_Correct/ObsModel/Obs.Obs.ObsVert/"
+model.name <- "Combined_thinMat_Obs_L1.N1.A2vert_"
 met.variable <- NULL
 
 for(i in 1:3){
   dir <- paste0(top.dir, site.folders[i])
-  model <- paste0("Combined_thinMat_NULL_", site.folders[i], "Control.RData")
+  model <- paste0(model.name, site.folders[i], "Control.RData")
   load(file.path(dir, model))
   
   cat("Calculating WAIC for", model, "\n")
@@ -58,11 +59,37 @@ for(i in 1:3){
   fbar <- colMeans(like)
   like[like==0] <- 1E-10
   Pw <- sum(apply(log(like),2,var))
-  WAIC <- -2*sum(log(fbar))+2*Pw
+  lppd <- sum(log(fbar))
+  WAIC <- -2*lppd + 2*Pw
   
   cat("Pw:", Pw, "\n")
+  cat("lppd:", lppd, "\n")
   cat("WAIC:", WAIC, "\n\n\n")
+  
+  waic.dat <- data.frame(site = site.folders[i],
+                    Pw = Pw,
+                    lppd = lppd,
+                    WAIC = WAIC,
+                    model = model.name)
+  
+  load("WAIC.RData")
+  dat <- rbind(dat, waic.dat)
+  save(dat, file = "WAIC.RData")
+  
 }
+
+dat.green <- subset(dat, site=="Green")
+dat.green$WAIC.diff <- min(dat.green$WAIC) - dat.green$WAIC
+
+dat.henry <- subset(dat, site=="Henry")
+dat.henry$WAIC.diff <- min(dat.henry$WAIC) - dat.henry$WAIC
+
+dat.tea <- subset(dat, site=="Tea")
+dat.tea$WAIC.diff <- min(dat.tea$WAIC) - dat.tea$WAIC
+
+
+# dat <- dat[1:36,]
+# save(dat, file = "WAIC.RData")
 
 
 
