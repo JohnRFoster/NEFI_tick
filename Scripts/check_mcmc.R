@@ -3,7 +3,7 @@ library(runjags)
 
 ## Independent Models ##
 sites <- c("Green", "Henry", "Tea")
-num.out <- c(30, 30, 30)
+num.out <- c(10, 9, 20)
 
 # read array job number to paste into output file
 xx <- as.numeric(Sys.getenv("SGE_TASK_ID")) 
@@ -11,8 +11,8 @@ xx <- as.numeric(Sys.getenv("SGE_TASK_ID"))
 site <- sites[xx]
 num.out <- num.out[xx]
 
-dir <- paste0("../FinalOut/A_Correct/ObsModel/L1.N1.A1/", site)
-model <- paste0("Obs_111_Beta_", site, "Control")
+dir <- paste0("../FinalOut/A_Correct/ObsModel/Obs.Obs.ObsVert/", site)
+model <- paste0("Obs_L1.N1.A2vert_", site, "Control")
 
 # dir <- paste0("../FinalOut/HB_Obs1_Proc1/VPDProc")
 # model <- paste0("VPD_ObsProc_beta_111_K_set")
