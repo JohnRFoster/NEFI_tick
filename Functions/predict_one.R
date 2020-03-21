@@ -82,10 +82,14 @@ predict_one <- function(type, site, met.variable, params, ic, data, A_func){
       Ex <- TRANS %*% obs
       est.mvnorm <- rmvnorm(1,Ex,ua$SIGMA[,,m])
       
+      b.larva <- rbinom(1, 1, obs.prob$theta.larva[m,t+1])
+      b.nymph <- rbinom(1, 1, obs.prob$theta.nymph[m,t+1])
+      b.adult <- rbinom(1, 1, obs.prob$theta.adult[m,t+1])
+      
       ## Observation model
-      pred[1,t,m] <- max(est.mvnorm[1], 0) * rbinom(1, 1, obs.prob$theta.larva[m,t+1])
-      pred[2,t,m] <- max(est.mvnorm[2], 0) * rbinom(1, 1, obs.prob$theta.nymph[m,t+1])
-      pred[3,t,m] <- max(est.mvnorm[3], 0) * rbinom(1, 1, obs.prob$theta.adult[m,t+1])
+      pred[1,t,m] <- max(est.mvnorm[1], 0)*b.larva + 1E-10 
+      pred[2,t,m] <- max(est.mvnorm[2], 0)*b.nymph + 1E-10 
+      pred[3,t,m] <- max(est.mvnorm[3], 0)*b.adult + 1E-10 
       
     }
   }
