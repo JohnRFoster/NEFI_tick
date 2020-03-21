@@ -36,6 +36,8 @@ obs_prob <- function(ua, N_est, obs.temp = NULL){
     theta.adult <- function(){1 / (1 + ua$beta.a.obs*(ua$beta.a.lat + obs.temp)^2)}
   } else if ("beta.a.obs" %in% monitor & "beta.a.lat" %in% monitor & "beta.a.vert" %in% monitor){
     theta.adult <- function(){1 / (1 + ua$beta.a.vert + ua$beta.a.obs*(ua$beta.a.lat + obs.temp)^2)}
+  } else if ("beta.a.obs" %in% monitor & !("beta.a.lat" %in% monitor) & "beta.a.vert" %in% monitor){
+    theta.adult <- function(){1 / (1 + ua$beta.a.vert + ua$beta.a.obs*obs.temp^2)}
   }
   
   larva.prob <- nymph.prob <- adult.prob <- matrix(NA, length(ua$deviance), N_est)
