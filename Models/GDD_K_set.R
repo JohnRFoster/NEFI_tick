@@ -31,6 +31,14 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
   # subset data to site.run and met variable of interest
   data <- site_data_met(site = site.run, met.variable = met.proc, data)
   
+  met.diff <- rep(NA, data$N_days)
+  for(m in 2:length(data$met)){
+    met.diff[m] <- data$met[m] - data$met[m-1]
+  }
+  data$met.diff <- met.diff
+  data$met.diff.miss <- which(is.na(met.diff))
+  data$met.diff.range <- range(met.diff, na.rm = TRUE)
+  
   seq.days <- matrix(NA, data$N_est-1, max(data$df, na.rm = TRUE))
   for(i in 1:(data$N_est-1)){
     xx <- (data$dt.index[i+1]-1):data$dt.index[i]
@@ -61,6 +69,7 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
                "phi.l.mu",
                "phi.n.mu",
                "phi.a.mu",
+               "beta.a",
                "grow.ln.mu",
                "grow.na.mu",
                "repro.mu",
@@ -90,20 +99,22 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
   
   ### precision priors
   SIGMA ~ dwish(R, 4)         # mvn [3 x 3] site process
+
+  beta.a ~ dnorm(0, 0.01)
   
   ## observation regression priors
   beta.l.obs ~ dnorm(0, 0.001) T(1E-10,)
-  beta.n.obs ~ dnorm(0, 0.001) T(1E-10,)
-  beta.a.obs ~ dnorm(0, 0.001) T(1E-10,)
+  # beta.n.obs ~ dnorm(0, 0.001) T(1E-10,)
+  # beta.a.obs ~ dnorm(0, 0.001) T(1E-10,)
   # beta.l.vert ~ dnorm(0, 0.001) T(0,)
   # beta.n.vert ~ dnorm(0, 0.001) T(0,)
-  beta.a.vert ~ dnorm(0, 0.001) T(0,)
+  # beta.a.vert ~ dnorm(0, 0.001) T(0,)
   # beta.l.lat ~ dnorm(0, 0.001)
   # beta.n.lat ~ dnorm(0, 0.001)
   # beta.a.lat ~ dnorm(0, 0.001)
   # theta.larva ~ dunif(0,1)
-  # theta.nymph ~ dunif(0,1)
-  # theta.adult ~ dunif(0,1)
+  theta.nymph ~ dunif(0,1)
+  theta.adult ~ dunif(0,1)
   
   ### first latent process 
   x[1, 1] ~ dpois(1) 
@@ -112,7 +123,11 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
   
   ## missing temperature model - observation
   for(t in met.obs.miss){
-  met.obs[t] ~ dunif(met.obs.range[1], met.obs.range[2])
+    met.obs[t] ~ dunif(met.obs.range[1], met.obs.range[2])
+  }
+  ## missing process met
+  for(t in met.diff.miss){
+    met.diff[t] ~ dunif(met.diff.range[1], met.diff.range[2])
   }
   
   logit(phi.11) <- phi.l.mu 
@@ -134,7 +149,7 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
   A.day[2,1,t] <- phi.11*theta.21[t] 
   A.day[2,2,t] <- phi.22*(1-theta.32[t]) 
   A.day[3,2,t] <- phi.22*theta.32[t]
-  logit(A.day[3,3,t]) <- phi.a.mu 
+  logit(A.day[3,3,t]) <- phi.a.mu + beta.a*met.diff[t]
   A.day[1,3,t] <- lambda[t]
   A.day[1,2,t] <- 0
   A.day[2,3,t] <- 0
@@ -184,13 +199,13 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
   
   ## observation probability based on temperature
   theta.larva[t] <- 1 / (1 + beta.l.obs*(met.obs[t])^2)
-  theta.nymph[t] <- 1 / (1 + beta.n.obs*(met.obs[t])^2)
-  theta.adult[t] <- 1 / (1 + beta.a.vert + beta.a.obs*(met.obs[t])^2)
+  # theta.nymph[t] <- 1 / (1 + beta.n.obs*(met.obs[t])^2)
+  # theta.adult[t] <- 1 / (1 + beta.a.vert + beta.a.obs*(met.obs[t])^2)
   
   ## binary outcome of observation by life stage
   b.larva[t] ~ dbern(theta.larva[t])
-  b.nymph[t] ~ dbern(theta.nymph[t])
-  b.adult[t] ~ dbern(theta.adult[t])
+  b.nymph[t] ~ dbern(theta.nymph)
+  b.adult[t] ~ dbern(theta.adult)
   
   } # t
 }" 
