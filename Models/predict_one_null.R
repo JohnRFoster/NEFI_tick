@@ -22,7 +22,10 @@
 library(mvtnorm)
 library(boot)
 
-# source("Functions/site_data_met.R")
+source("Functions/site_data_met.R")
+source("Functions/ua_parts.R")
+source("Functions/obs_prob.R")
+source("Functions/build_periodic_matrices_null.R")
 
 predict_one_null <- function(type, site, params, ic, data){
   
