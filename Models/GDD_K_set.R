@@ -31,13 +31,13 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
   # subset data to site.run and met variable of interest
   data <- site_data_met(site = site.run, met.variable = met.proc, data)
   
-  met.diff <- rep(NA, data$N_days)
-  for(m in 2:length(data$met)){
-    met.diff[m] <- data$met[m] - data$met[m-1]
-  }
-  data$met.diff <- met.diff
-  data$met.diff.miss <- which(is.na(met.diff))
-  data$met.diff.range <- range(met.diff, na.rm = TRUE)
+  # met.diff <- rep(NA, data$N_days)
+  # for(m in 2:length(data$met)){
+  #   met.diff[m] <- data$met[m] - data$met[m-1]
+  # }
+  # data$met.diff <- met.diff
+  # data$met.diff.miss <- which(is.na(met.diff))
+  # data$met.diff.range <- range(met.diff, na.rm = TRUE)
   
   seq.days <- matrix(NA, data$N_est-1, max(data$df, na.rm = TRUE))
   for(i in 1:(data$N_est-1)){
@@ -61,6 +61,7 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
                            phi.l.mu = rnorm(1, data$larva.mean, 0.1),
                            phi.n.mu = rnorm(1, data$nymph.mean, 0.1),
                            phi.a.mu = rnorm(1, 6, 0.001),
+                           beta.a = abs(rnorm(1, 0, 0.1)),
                            grow.ln.mu = rnorm(1, -6, 0.1),
                            grow.na.mu = rnorm(1, -6, 0.1))}
   
@@ -75,17 +76,17 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
                "repro.mu",
                "SIGMA",
                # "theta.larva",
-               # "theta.nymph",
-               # "theta.adult",
-               "beta.l.obs",
+               "theta.nymph",
+               "theta.adult",
+               "beta.l.obs")
                # "beta.l.lat",
                # "beta.l.vert")
-               "beta.n.obs",
+               # "beta.n.obs",
                # "beta.n.lat",
                # "beta.n.vert",
-               "beta.a.obs",
+               # "beta.a.obs")
                # "beta.a.lat",
-               "beta.a.vert")
+               # "beta.a.vert")
   
   model = " model {
   
@@ -126,8 +127,8 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
     met.obs[t] ~ dunif(met.obs.range[1], met.obs.range[2])
   }
   ## missing process met
-  for(t in met.diff.miss){
-    met.diff[t] ~ dunif(met.diff.range[1], met.diff.range[2])
+  for(t in met.mis){
+    met[t] ~ dunif(met.range[1], met.range[2])
   }
   
   logit(phi.11) <- phi.l.mu 
@@ -149,7 +150,7 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
   A.day[2,1,t] <- phi.11*theta.21[t] 
   A.day[2,2,t] <- phi.22*(1-theta.32[t]) 
   A.day[3,2,t] <- phi.22*theta.32[t]
-  logit(A.day[3,3,t]) <- phi.a.mu + beta.a*met.diff[t]
+  logit(A.day[3,3,t]) <- phi.a.mu + beta.a*met[t]
   A.day[1,3,t] <- lambda[t]
   A.day[1,2,t] <- 0
   A.day[2,3,t] <- 0
