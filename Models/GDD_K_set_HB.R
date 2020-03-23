@@ -78,7 +78,8 @@ run_model <- function(met.proc, n.adapt, n.chains){
                # "beta.a.obs",
                # "beta.a.lat",
                # "beta.a.vert")
-               "alpha.a")
+               "alpha.a",
+               "tau.a")
   
   model = " model {
   
