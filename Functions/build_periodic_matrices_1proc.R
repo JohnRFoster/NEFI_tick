@@ -13,9 +13,25 @@ build_periodic_matrices_1proc <- function(ua, data){
 
   # build matrices
   for(m in seq_along(ua$phi.a.mu)){
-  
-    phi.11 <- inv.logit(ua$phi.l.mu[m] + ua$beta.11[m]*met)
-    phi.22 <- inv.logit(ua$phi.n.mu[m] + ua$beta.22[m]*met)
+    
+    if("beta.l" %in% names(ua)){
+      phi.11 <- inv.logit(ua$phi.l.mu[m] + ua$beta.l[m]*met)
+    } else {
+      phi.11 <- inv.logit(ua$phi.l.mu[m])
+    }
+    
+    if("beta.n" %in% names(ua)){
+      phi.22 <- inv.logit(ua$phi.n.mu[m] + ua$beta.n[m]*met)
+    } else {
+      phi.22 <- inv.logit(ua$phi.n.mu[m])
+    }
+    
+    if("beta.a" %in% names(ua)){
+      phi.33 <- inv.logit(ua$phi.a.mu[m] + ua$beta.a[m]*met)
+    } else {
+      phi.33 <- inv.logit(ua$phi.a.mu[m])
+    }
+      
     lambda <- ifelse(gdd >= 1500 & gdd <= 2500, ua$repro.mu[m], 0)
     theta.32 <- ifelse(gdd <= 1000 | gdd >= 2500, inv.logit(ua$grow.na.mu[m]), 0)
     theta.21 <- ifelse(gdd >= 500 & gdd <= 2500, inv.logit(ua$grow.ln.mu[m]), 0)  
@@ -25,7 +41,7 @@ build_periodic_matrices_1proc <- function(ua, data){
     A[2,1,,m] <- phi.11*theta.21
     A[2,2,,m] <- phi.22*(1-theta.32)
     A[3,2,,m] <- phi.22*theta.32
-    A[3,3,,m] <- inv.logit(ua$phi.a.mu[m] + ua$beta.33[m]*met)
+    A[3,3,,m] <- phi.33
     A[1,3,,m] <- lambda
   }
   return(A)
