@@ -115,19 +115,19 @@ predict_one <- function(type, site, met.variable, params, ic, data, A_func){
 #                     build_periodic_matrices_null)
 # 
 # 
-load("../FinalOut/Independent_Fits/GDDThreshold/RH_ObsProc/beta_111/Green/Combined_thinMat_MaxRH_ObsProc_beta_111_K_set_GreenControl.RData")
-source("Functions/build_periodic_matrices_1proc.R")
-data <- cary_ticks_met_JAGS()
-site <- "Green Control"
-type <- c("ic", "process", "parameter")
-Nmc <- 300
-draw <- sample.int(nrow(params.mat), Nmc, replace = TRUE)
-params <- params.mat[draw,]
-ic <- predict.mat[draw,]
-test <- predict_one(type,
-                    site,
-                    "max rh",
-                    params,
-                    ic,
-                    data,
-                    build_periodic_matrices_1proc)
+# load("../FinalOut/Independent_Fits/GDDThreshold/RH_ObsProc/beta_111/Green/Combined_thinMat_MaxRH_ObsProc_beta_111_K_set_GreenControl.RData")
+# source("Functions/build_periodic_matrices_1proc.R")
+# data <- cary_ticks_met_JAGS()
+# site <- "Green Control"
+# type <- c("ic", "process", "parameter")
+# Nmc <- 300
+# draw <- sample.int(nrow(params.mat), Nmc, replace = TRUE)
+# params <- params.mat[draw,]
+# ic <- predict.mat[draw,]
+# test <- predict_one(type,
+#                     site,
+#                     "max rh",
+#                     params,
+#                     ic,
+#                     data,
+#                     build_periodic_matrices_1proc)
