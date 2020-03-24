@@ -79,7 +79,9 @@ run_model <- function(met.proc, n.adapt, n.chains){
                # "beta.a.lat",
                # "beta.a.vert")
                "alpha.a",
-               "tau.a")
+               "alpha.n",
+               "tau.a",
+               "tau.n")
   
   model = " model {
   
@@ -94,10 +96,12 @@ run_model <- function(met.proc, n.adapt, n.chains){
   ### precision priors
   SIGMA ~ dwish(R, 4)          # mvn [3 x 3] site process
   tau.a ~ dgamma(0.001, 0.001) # adult survival random effect 
+  tau.n ~ dgamma(0.001, 0.001) # nymph survival random effect 
 
   ### random effect prior
   for(s in 1:3){
     alpha.a[s] ~ dnorm(0, tau.a)
+    alpha.n[s] ~ dnorm(0, tau.n)
   }
   
   ## observation regression priors
@@ -140,7 +144,7 @@ run_model <- function(met.proc, n.adapt, n.chains){
     for(s in 1:3){
       A.day[1,1,t,s] <- phi.11*(1-theta.21[t]) 
       A.day[2,1,t,s] <- phi.11*theta.21[t] 
-      A.day[2,2,t,s] <- phi.22*(1-theta.32[t]) 
+      A.day[2,2,t,s] <- phi.22*(1-theta.32[t]) + alpha.n[s]
       A.day[3,2,t,s] <- phi.22*theta.32[t]
       logit(A.day[3,3,t,s]) <- phi.a.mu + alpha.a[s]
       A.day[1,3,t,s] <- lambda[t]
