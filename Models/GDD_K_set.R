@@ -31,13 +31,13 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
   # subset data to site.run and met variable of interest
   data <- site_data_met(site = site.run, met.variable = met.proc, data)
   
-  # met.diff <- rep(NA, data$N_days)
-  # for(m in 2:length(data$met)){
-  #   met.diff[m] <- data$met[m] - data$met[m-1]
-  # }
-  # data$met.diff <- met.diff
-  # data$met.diff.miss <- which(is.na(met.diff))
-  # data$met.diff.range <- range(met.diff, na.rm = TRUE)
+  met.diff <- rep(NA, data$N_days)
+  for(m in 2:length(data$met)){
+    met.diff[m] <- data$met[m] - data$met[m-1]
+  }
+  data$met <- met.diff
+  data$met.mis <- which(is.na(met.diff))
+  data$met.range <- range(met.diff, na.rm = TRUE)
   
   seq.days <- matrix(NA, data$N_est-1, max(data$df, na.rm = TRUE))
   for(i in 1:(data$N_est-1)){
