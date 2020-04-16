@@ -35,9 +35,9 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
   for(m in 2:length(data$met)){
     met.diff[m] <- data$met[m] - data$met[m-1]
   }
-  data$met <- met.diff
-  data$met.mis <- which(is.na(met.diff))
-  data$met.range <- range(met.diff, na.rm = TRUE)
+  data$met.diff <- met.diff
+  data$met.mis.diff <- which(is.na(met.diff))
+  data$met.range.diff <- range(met.diff, na.rm = TRUE)
   
   seq.days <- matrix(NA, data$N_est-1, max(data$df, na.rm = TRUE))
   for(i in 1:(data$N_est-1)){
@@ -47,6 +47,8 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
   data$seq.days <- seq.days
   
   data$R <- diag(1, 3, 3)
+  data$beta.mu <- c(0,0)
+  data$beta.prec <- diag(0.01,2,2)
  
   # get survival estimates
   survival <- get_survival(larva.driver = met.proc,
@@ -57,11 +59,11 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
   data$nymph.prec <- survival$nymph.survival.prec
   
   inits <- function(){list(p = data$y[,-1],
-                           repro.mu = runif(1, 10, 20),
+                           repro.mu = runif(1, 0, 10),
                            phi.l.mu = rnorm(1, data$larva.mean, 0.1),
                            phi.n.mu = rnorm(1, data$nymph.mean, 0.1),
                            phi.a.mu = rnorm(1, 6, 0.001),
-                           beta.a = abs(rnorm(1, 0, 0.1)),
+                           beta.a = runif(2, -0.1, 0.1),
                            grow.ln.mu = rnorm(1, -6, 0.1),
                            grow.na.mu = rnorm(1, -6, 0.1))}
   
@@ -101,7 +103,7 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
   ### precision priors
   SIGMA ~ dwish(R, 4)         # mvn [3 x 3] site process
 
-  beta.a ~ dnorm(0, 0.01)
+  beta.a ~ dmnorm(beta.mu, beta.prec)
   
   ## observation regression priors
   beta.l.obs ~ dnorm(0, 0.001) T(1E-10,)
@@ -130,6 +132,9 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
   for(t in met.mis){
     met[t] ~ dunif(met.range[1], met.range[2])
   }
+  for(t in met.mis.diff){
+    met.diff[t] ~ dunif(met.range.diff[1], met.range.diff[2])
+  }
   
   logit(phi.11) <- phi.l.mu 
   logit(phi.22) <- phi.n.mu
@@ -150,7 +155,7 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
   A.day[2,1,t] <- phi.11*theta.21[t] 
   A.day[2,2,t] <- phi.22*(1-theta.32[t]) 
   A.day[3,2,t] <- phi.22*theta.32[t]
-  logit(A.day[3,3,t]) <- phi.a.mu + beta.a*met[t]
+  logit(A.day[3,3,t]) <- phi.a.mu + beta.a[1]*met[t] + beta.a[2]*met.diff[t]
   A.day[1,3,t] <- lambda[t]
   A.day[1,2,t] <- 0
   A.day[2,3,t] <- 0
