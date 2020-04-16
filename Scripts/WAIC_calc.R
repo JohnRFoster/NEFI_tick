@@ -10,9 +10,9 @@ data.hb <- cary_ticks_met_JAGS()
 
 site.folders <- c("Green", "Henry", "Tea")
 sites <- c("Green Control", "Henry Control", "Tea Control")
-top.dir <- "../FinalOut/A_Correct/ObsModel/Obs.Obs.ObsVert/"
-model.name <- "Combined_thinMat_Obs_L1.N1.A2vert_"
-met.variable <- NULL
+top.dir <- "../FinalOut/A_Correct/ObsProcModels/Obs_L1N0A0.Proc_AdultRh/"
+model.name <- "Combined_thinMat_Obs_L1.N0.A0_Proc_ARh_RhDiff"
+met.variable <- "max rh"
 
 for(i in 1:3){
   dir <- paste0(top.dir, site.folders[i])
@@ -66,17 +66,21 @@ for(i in 1:3){
   cat("lppd:", lppd, "\n")
   cat("WAIC:", WAIC, "\n\n\n")
   
+  name.save <- gsub("Combined_thinMat_", "", model.name)
+  
   waic.dat <- data.frame(site = site.folders[i],
                     Pw = Pw,
                     lppd = lppd,
                     WAIC = WAIC,
-                    model = model.name)
+                    model = model.save)
   
   load("WAIC.RData")
   dat <- rbind(dat, waic.dat)
   save(dat, file = "WAIC.RData")
   
 }
+
+
 
 dat.green <- subset(dat, site=="Green")
 dat.green$WAIC.diff <- min(dat.green$WAIC) - dat.green$WAIC
