@@ -160,18 +160,20 @@ mice_06_18 <- function(grid){
   }
   colnames(ch.base) <- days
   
-  known_states <- function(ch){
-    state <- ch
-    for (i in 1:dim(ch)[1]){
-      n1 <- min(which(ch[i,] != 0))
-      n2 <- max(which(ch[i,] != 0))
-      if(n2 > n1){state[i, n1:n2] <- 1}
-      #state[i, n1:n2] <- 1
-    }
-    return(state)
-  }
+  # known_states <- function(ch){
+  #   state <- ch
+  #   for (i in 1:dim(ch)[1]){
+  #     n1 <- min(which(ch[i,] != 0))
+  #     n2 <- max(which(ch[i,] != 0))
+  #     if(n2 > n1){state[i, n1:n2] <- 1}
+  #     #state[i, n1:n2] <- 1
+  #   }
+  #   return(state)
+  # }
+  # 
+  # ks <- known_states(ch.base)
+  # return <- apply(ks, 2, sum)
   
-  ks <- known_states(ch.base)
-  return <- apply(ks, 2, sum)
-  return(return)
+  return(list(full.matrix = ch.base,
+              table = m))
 }
