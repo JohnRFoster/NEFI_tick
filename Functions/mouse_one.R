@@ -53,8 +53,10 @@ mouse_one <- function(site, jags.out, type, data){
   
   for(m in 1:Nmc){
     
+    p[1:N.jags[m,1],1,m] <- 1
+    
     # % counter
-    percent <- round(m/Nmc*100)
+    percent <- m/Nmc*100
     if(percent%%20==0){cat(percent, "% ensembles completed\n")}
     
     lambda <- inv.logit(lambda.mean[m] + beta.1[m]*precip[,1] + beta.2[m]*temp[,1])
@@ -67,25 +69,29 @@ mouse_one <- function(site, jags.out, type, data){
     for(t in 2:(time-1)){
       
       # initialize
-      p[1:N.jags[m,t-1],t-1,m] <- 1
+      # p[1:N.jags[m,t-1],t-1,m] <- 1
+      
+      ic.vec <- rep(0, ind)
+      ic.vec[1:N.jags[m,t-1]] <- 1
+      
       
       ## State Process
-      q[,t-1] <- 1 - p[,t-1,m] 
-      q.prod <- rep(NA, nrow(q))
+      # q[,t-1] <- 1 - p[,t-1,m] 
+      # q.prod <- rep(NA, nrow(q))
       
       # q.prod <- apply(q, 1, function(x) prod(x[1:(t-1)]))
       
-      for(i in 1:nrow(q)){
-        q.prod[i] <- prod(q[i, 1:(t-1)])
-      }
+      # for(i in 1:nrow(q)){
+        # q.prod[i] <- prod(q[i, 1:(t-1)])
+      # }
       
-      mu1 <- phi[t-1] * p[,t-1,m] + gamma[m,t] * q.prod
+      mu1 <- phi[t-1] * ic.vec + gamma[m,t] * (1-ic.vec)
       
       if("process" %in% type){
         # Bernoulli trial
-        p[,t,m] <- rbinom(ind, 1, mu1*p[,t-1,m])  
+        p[,t,m] <- rbinom(ind, 1, mu1)  
       } else {
-        p[,t,m] <- mu1*p[,t-1,m]
+        p[,t,m] <- mu1
       }
       
       ## Observation process
