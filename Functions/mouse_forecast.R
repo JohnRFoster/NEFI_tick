@@ -23,7 +23,7 @@ mouse_forecast <- function(days, params, ic, precip, temp){
     # if(m%%100==0){cat(round(m/Nmc*100), "% ensembles completed\n")}
     
     lambda <- inv.logit(lambda.mean[m] + beta.1[m]*precip + beta.2[m]*temp)
-    
+
     phi <- rep(NA, days)
     for(d in 1:days){  ## loop over capture event
       phi[d] <- prod(lambda[1:dt[d]])
