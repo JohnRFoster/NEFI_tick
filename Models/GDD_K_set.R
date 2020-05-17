@@ -31,13 +31,13 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
   # subset data to site.run and met variable of interest
   data <- site_data_met(site = site.run, met.variable = met.proc, data)
   
-  met.diff <- rep(NA, data$N_days)
-  for(m in 2:length(data$met)){
-    met.diff[m] <- data$met[m] - data$met[m-1]
-  }
-  data$met.diff <- met.diff
-  data$met.mis.diff <- which(is.na(met.diff))
-  data$met.range.diff <- range(met.diff, na.rm = TRUE)
+  # met.diff <- rep(NA, data$N_days)
+  # for(m in 2:length(data$met)){
+  #   met.diff[m] <- data$met[m] - data$met[m-1]
+  # }
+  # data$met.diff <- met.diff
+  # data$met.mis.diff <- which(is.na(met.diff))
+  # data$met.range.diff <- range(met.diff, na.rm = TRUE)
   
   seq.days <- matrix(NA, data$N_est-1, max(data$df, na.rm = TRUE))
   for(i in 1:(data$N_est-1)){
@@ -47,16 +47,18 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
   data$seq.days <- seq.days
   
   data$R <- diag(1, 3, 3)
-  data$beta.mu <- c(0,0)
-  data$beta.prec <- diag(0.01,2,2)
+  data$beta.mu <- 0
+  data$beta.prec <- 0.01
  
   # get survival estimates
-  survival <- get_survival(larva.driver = met.proc,
+  survival <- get_survival(larva.driver = NULL,
                            nymph.driver = met.proc)
   data$larva.mean <- survival$larva.survival.mean
   data$larva.prec <- survival$larva.survival.prec
   data$nymph.mean <- survival$nymph.survival.mean
   data$nymph.prec <- survival$nymph.survival.prec
+  data$nymph.beta.mu <- survival$nymph.beta.mean
+  data$nymph.beta.prec <- survival$nymph.beta.prec
   
   inits <- function(){list(p = data$y[,-1],
                            repro.mu = runif(1, 0, 10),
@@ -72,7 +74,7 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
                "phi.l.mu",
                "phi.n.mu",
                "phi.a.mu",
-               "beta.a",
+               "beta.n",
                "grow.ln.mu",
                "grow.na.mu",
                "repro.mu",
@@ -103,7 +105,7 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
   ### precision priors
   SIGMA ~ dwish(R, 4)         # mvn [3 x 3] site process
 
-  beta.a ~ dmnorm(beta.mu, beta.prec)
+  beta.n ~ dnorm(nymph.beta.mu, nymph.beta.prec)
   
   ## observation regression priors
   beta.l.obs ~ dnorm(0, 0.001) T(1E-10,)
@@ -132,12 +134,11 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
   for(t in met.mis){
     met[t] ~ dunif(met.range[1], met.range[2])
   }
-  for(t in met.mis.diff){
-    met.diff[t] ~ dunif(met.range.diff[1], met.range.diff[2])
-  }
+  # for(t in met.mis.diff){
+  #   met.diff[t] ~ dunif(met.range.diff[1], met.range.diff[2])
+  # }
   
   logit(phi.11) <- phi.l.mu 
-  logit(phi.22) <- phi.n.mu
   logit(l2n) <- grow.ln.mu
   logit(n2a) <- grow.na.mu
   
@@ -150,12 +151,13 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
   theta.21[t] <- ifelse((gdd[t] >= 500) && (gdd[t] <= 2500),l2n,0)
   theta.32[t] <- ifelse((gdd[t] <= 1000) || (gdd[t] >= 2500),n2a,0)
   lambda[t] <- ifelse((gdd[t] >= 1500) && (gdd[t] <= 2500),repro.mu,0)
+  logit(phi.22[t]) <- phi.n.mu + beta.n*met[t]
   
   A.day[1,1,t] <- phi.11*(1-theta.21[t]) 
   A.day[2,1,t] <- phi.11*theta.21[t] 
-  A.day[2,2,t] <- phi.22*(1-theta.32[t]) 
-  A.day[3,2,t] <- phi.22*theta.32[t]
-  logit(A.day[3,3,t]) <- phi.a.mu + beta.a[1]*met[t] + beta.a[2]*met.diff[t]
+  A.day[2,2,t] <- phi.22[t]*(1-theta.32[t]) 
+  A.day[3,2,t] <- phi.22[t]*theta.32[t]
+  logit(A.day[3,3,t]) <- phi.a.mu 
   A.day[1,3,t] <- lambda[t]
   A.day[1,2,t] <- 0
   A.day[2,3,t] <- 0
