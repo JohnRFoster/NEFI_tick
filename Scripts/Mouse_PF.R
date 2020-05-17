@@ -1,53 +1,46 @@
+script.start <- Sys.time()
+
 library(ecoforecastR)
 library(boot)
 library(lubridate)
+library(parallel)
+library(abind)
 
 source("Functions/mice_06_08.R")
 source("Functions/Future_Met.R")
 source("Functions/create_ncdf_mouse.R")
-source("Functions/loglik_Bernoulli.R")
-source("Functions/mouse_forecast.R")
+source("Functions/mouse_forecast_parallel.R")
+source("Functions/new_mouse_observation.R")
 
 # Forecast_id <- uuid::UUIDgenerate() # ID that applies to the specific forecast
 Forecast_id <- "05cf9022-6ea7-415f-88b7-c4f546a596a0"
-ForecastProject_id <-
-  20200414 # Some ID that applies to a set of forecasts
+ForecastProject_id <- 20200414 # Some ID that applies to a set of forecasts
 
 dir <- "../FinalOut/DA_Runs/Mouse_Hindcast/Green"
 
+file.name <- "Green_parameters.RData"
+file <- file.path(dir, file.name)
 
-new_mouse_observation <- function(capt.history, mice, days, index) {
-  current.date <- days[index]
-  
-  if (current.date %in% mice$Full.Date.1) {
-    current.matrix <- mice %>%
-      filter(Full.Date.1 == current.date) %>%
-      select(Tag.., Day.1) %>%
-      filter(Day.1 == 1)
-  } else if (current.date %in% mice$Full.Date.2) {
-    current.matrix <- mice %>%
-      filter(Full.Date.2 == current.date) %>%
-      select(Tag.., Day.2)
-  }
-  
-  # full capture history
-  capt.history <-
-    full_join(capt.history, current.matrix, by = "Tag..")
-  
-  # convert NAs to 0
-  last <- ncol(capt.history)
-  capt.history[which(is.na(capt.history[, last])), last] <- 0
-  
-  # capt.history <- capt.history[,c(1,ncol(capt.history))]
-  
-  return(capt.history)
-}
+print(file)
+
+### parallel set-up
+# read number of parallel slots (cores requested)
+n.slots <- as.numeric(Sys.getenv("NSLOTS"))
+cat("Number of slots:", n.slots, "\n")
+
+# make clusters
+# cl <- parallel::makeCluster(n.slots-1)
+# showConnections()
 
 load("../FinalOut/GreenControlMR/GreenControlMR_1_5.RData")
 params <- as.matrix(jags.out)
-Nmc <- 500
+Nmc.per.node <- 100
+Nmc <- Nmc.per.node * n.slots
 draw <- sample.int(nrow(params), Nmc)
 params <- params[draw, ]
+
+cat("Running", Nmc.per.node, "ensembles per node\n")
+cat(Nmc, " total ensembles\n")
 
 # store historical parameters
 params.hist <- list()
@@ -59,12 +52,9 @@ mice <- mice.future$table
 ch <- mice.future$full.matrix
 mice.observed <- colSums(ch)
 
-day.1 <-
-  as.character(unique(mice$Full.Date.1))        # 1st capture date of sampling occasion
-day.2 <-
-  as.character(unique(mice$Full.Date.2))        # 2nd capture date of sampling occasion
-days <-
-  ymd(c(rbind(day.1, day.2)))                    # vector of unique trapping days (for colnames)
+day.1 <- as.character(unique(mice$Full.Date.1)) # 1st capture date of sampling occasion
+day.2 <- as.character(unique(mice$Full.Date.2)) # 2nd capture date of sampling occasion
+days <-  ymd(c(rbind(day.1, day.2))) # vector of unique trapping days (for colnames)
 future.obs.index <- cumsum(as.numeric(diff(days)))
 future.obs.index <- c(1, future.obs.index + 1)
 
@@ -75,91 +65,100 @@ start.index <- match(start.date, met$date)
 
 met <- met[start.index:nrow(met), ]
 
-
-
-
-
-
-
 ## first initial conditions is first observation of 2006
 current.date <- days[1]
-current.matrix <- mice %>%
+capt.history <- mice %>%
   filter(Full.Date.1 == current.date) %>%
   select(Tag.., Day.1) %>%
   filter(Day.1 == 1)
 
-capt.history <- current.matrix
+# just want observation vector
+obs <- capt.history[,2]
 
 # first initialize every ensemble to the capture history
-ic <- matrix(0, nrow(current.matrix) * 4, Nmc)
-for (m in 1:Nmc) {
-  ic.index <- sample(nrow(capt.history), sum(capt.history[, 2]))
-  ic[ic.index, m] <- 1
+ic <- matrix(0, length(obs) * 4, Nmc)
+for(i in 1:Nmc){
+  ic[1:length(obs),] <- obs
   
-  # total number of latent mice
-  tot.mice <-
-    round(sum(capt.history[, 2]) / params[m, "theta"]) - sum(capt.history[, 2])
+  # inflate to latent number
+  inflate <- round(sum(obs) / params[i, "theta"]) - sum(obs)
   
-  ic.index <- sample(nrow(capt.history):nrow(ic), tot.mice)
-  ic[ic.index, m] <- 1
+  new.range <- (length(obs) + 1):nrow(ic) 
+  ic[sample(new.range, inflate), i] <- 1 
 }
+
+cat("Initial Condition range:", range(colSums(ic)), "\n")
+
+
 
 
 t <- 2 # for testing
 n.days <- 16
 index <- 1
-weight <- rep(1, Nmc)
-log.like <- matrix(0, Nmc, length(future.obs.index))
+weights <- rep(1, Nmc)
+like <- matrix(1, Nmc, length(future.obs.index))
 data_assimilation <- 0
-store.forecast.Nmc <- ens.store <- list()
+store.forecast.Nmc <- ens.store <- all.forecasts <- list()
 lambda <- matrix(1, Nmc, future.obs.index[length(future.obs.index)])
 resample <- rep(NA, length(future.obs.index))
 forecast.start.index <- 2
 days.since.obs <- 0
+weight.ncdf <- rep(1, Nmc) # weights for ncdf
 
 
-for (t in 2:(365 * 2)) {
-  # for(t in 2:23){
+
+for (t in 2:(365*10)) {
+  # for(t in 2:126){
   
   ### forecast step ###
+  
   # grab met
   met.seq <- forecast.start.index:(forecast.start.index + n.days - 1)
   precip <- met$precip[met.seq]
   temp <- met$temp.scale[met.seq]
   
+  # calculate and store daily survival
   for (d in seq_along(temp)) {
     lambda[, met.seq[d]] <- inv.logit(params[, "lambda.mean"] +
                                         params[, "beta[1]"] * precip[d] +
                                         params[, "beta[2]"] * temp[d])
   }
+  # start cluster (move to beginning of script???)
+  cl <- makeCluster(n.slots)
   
-  fore <- mouse_forecast(n.days, params, ic, precip, temp)
+  # list to split data into equal chunks
+  datapieces <- clusterSplit(cl, 1:Nmc)
   
-  # print(range(colSums(fore[2,,,n.days])))
+  # export required objects
+  clusterExport(cl, c("n.days", "params", "ic", "precip", "temp"))
+  
+  # run forecast on cluster nodes
+  fore <- parLapply(cl, datapieces, mouse_forecast_parallel)
+  
+  # stop cluster (move to end of script???)
+  stopCluster(cl)
+  
+  # combine forecast output
+  all.fore <- fore[[1]]
+  for (slot in 2:n.slots){
+    all.fore <- abind(all.fore, fore[[slot]], along = 3)
+  }
+
   # first date of forecast
   forecast_issue_time <- as.Date(days[t - 1])
-  
-  # name file
-  ncfname <- paste(t, "Mouse_hindcast_pf.nc", sep = "_")
-  
-  # write netCDF
-  # source("Functions/create_ncdf_mouse.R")
-  # create_ncdf_mouse(file.path(dir,ncfname),
-  #                   fore,
-  #                   forecast_issue_time,
-  #                   n.days,
-  #                   Nmc,
-  #                   data_assimilation,
-  #                   ForecastProject_id,
-  #                   Forecast_id,
-  #                   forecast_issue_time)
   
   # reset data assimilation to 0
   data_assimilation <- 0
   
   ### analysis step - if we make new observation ###
   if (t %in% future.obs.index) {
+    
+    all.forecasts[[index]] <- fore
+    
     cat("\n-----------------------\n")
+    loop.time <- Sys.time() - script.start
+    cat("Elapsed time:\n")
+    print(loop.time)
     cat(t, "days forecasted \n")
     
     # assimilating data, set to 1
@@ -173,8 +172,7 @@ for (t in 2:(365 * 2)) {
     forecast.start.index <- t + 1
     
     # observation
-    capt.history <-
-      new_mouse_observation(capt.history, mice, days, index)
+    capt.history <- new_mouse_observation(capt.history, mice, days, index)
     capt.history.new <- capt.history
     
     # find last day each mouse was captured
@@ -195,11 +193,7 @@ for (t in 2:(365 * 2)) {
     }
     if (length(dead) > 1) {
       dead <- dead[-1]
-      cat("Removing ",
-          length(dead),
-          "mice out of",
-          nrow(capt.history.new),
-          "in matrix\n")
+      cat("Removing ", length(dead), "mice out of", nrow(capt.history.new), "in matrix\n")
       capt.history <- capt.history[-dead, ]
     }
     
@@ -210,52 +204,55 @@ for (t in 2:(365 * 2)) {
     # total number observed
     obs.total <- sum(obs, na.rm = TRUE)
     
-    # prediction
+    # prediction and store
     if (days.since.obs > 2) {
-      pred.full <- fore[1, , , days.since.obs]
+      store.forecast.Nmc[[index]] <- all.fore
+      pred.full <- all.fore[1, , , days.since.obs]
+      pred.obs <- all.fore[2, , , days.since.obs]
     } else {
-      pred.full <- fore[1, , , 2]
+      store.forecast.Nmc[[index]] <- all.fore[,,,2]
+      pred.full <- all.fore[1, , , 2]
+      pred.obs <- all.fore[2, , , 2]
     }
     
     if (length(obs) < nrow(pred.full)) {
-      pred <- pred.full[1:length(obs), ]
+      pred <- pred.obs[1:length(obs), ]
+      pred.latent <- pred.full[1:length(obs), ]
     }
     
     # total predicted
-    pred.total <- colSums(fore[2, , , dim(fore)[4]])
+    pred.total <- colSums(pred.obs)
     pred.quantile <- quantile(pred.total, c(0.025, 0.5, 0.975))
     
     ens.store[[index]] <- pred.total
     
-    cat("\npredicted",
-        pred.quantile,
-        "\nobserved",
-        obs.total,
-        "\n")
+    cat("\npredicted summary:\n")
+    print(summary(pred.total))
+    cat("observed", obs.total, "\n")
     
     # likelihood (assign particles a weight)
-    # like <- matrix(NA, length(obs), Nmc)
-    # for(i in seq_along(obs)){ # individuals
-    #   for(m in 1:Nmc){ # ensembles
-    #     like[i,m] <- dbinom(obs[i], 1, pred[i,m]*params[m,"theta"])
-    #   }
-    # }
-    
-    # logLike <- rep(NA, Nmc)
-    cum.like <- matrix(NA, Nmc, index)
+    cum.like <- rep(NA, Nmc)
+    ens.like <- matrix(NA, Nmc, length(obs))
     for (i in 1:Nmc) {
-      # log likelihood
-      log.like[i, index] <- loglik_Bernoulli(params[i, "theta"], pred[, i])
       
-      # convert to cumulative likelihood
-      cum.like[i, ] <- exp(cumsum(log.like[i, 1:index]))
+      # likelihood
+      ens.like[i,] <- dbinom(obs, 1, params[i, "theta"] * pred.latent[, i])
+      
+      # mean weight for each ensemble
+      like.mu <- mean(ens.like[i,])
+      
+      # store
+      like[i, index] <- like.mu
+      
+      # convert to cumulative likelihood (weights)
+      cum.like[i] <- prod(like[i, 1:index])
     }
     
-    weights <- cum.like[, index]
-    
     # normalize weights
-    norm.weights <- weights / sum(weights)
-    print(round(norm.weights[1:20], 4))
+    norm.weights <- cum.like / sum(cum.like)
+    
+    # store weights to carry over
+    like[,index] <- norm.weights
     
     # effective sample size
     effect.size <- 1 / sum(norm.weights ^ 2)
@@ -267,32 +264,39 @@ for (t in 2:(365 * 2)) {
     
     # no resample
     if (effect.size > (Nmc / 2)) {
-      print(FALSE)
+      cat("Resample: FALSE \n")
       resample[index] <- FALSE
       
-      wts.ic <- matrix(NA, nrow(pred), 5)
-      # ic <- matrix(0, length(obs)*4, Nmc)
-      for (i in 1:nrow(pred)) {
-        wts.ic <- wtd.quantile(pred.full[i, ],
-                               weights / mean(weights),
-                               c(0.025, 0.25, 0.5, 0.75, 0.975))
-        
-        top <- rep(c(wts.ic[1], wts.ic[2], wts.ic[3], wts.ic[4], wts.ic[5]),
-              each = Nmc / 5)
-        
-        ic[i, ] <- top
+      # mice we know are alive
+      mice.1 <- which(obs == 1)
+      
+      # number of mice to inflate
+      # inflate <- round(pred.total / params[, "theta"])
+      
+      # weighted quantiles of total latent mice predicted
+      wts.ic <- wtd.quantile(pred.total,
+                             weights / mean(weights),
+                             c(0.025, 0.25, 0.5, 0.75, 0.975))
+      
+      build.mice <- rep(wts.ic, each = Nmc / 5)
+       
+      ic <- matrix(0, length(obs)*4, Nmc)
+      for (i in 1:Nmc) {
+        ic[sample(nrow(ic), build.mice[i]), i] <- 1
+        ic[mice.1, i] <- 1
       }
-      cat("Initial Condition range:", range(colSums(ic)))
+      cat("Initial Condition range:", range(colSums(ic)), "\n")
+      cat("Dim IC:", dim(ic), "\n")
       
-      # cat("Weighted quantiles:", wts.ic, "\n")
+      # weights for ncdf
+      weight.ncdf <- norm.weights
       
-      # resample
-    } else {
-      print(TRUE)
+    } else { # resample
+      cat("Resample: TRUE \n")
       resample[index] <- TRUE
       
       # resample with replacement
-      new.draw <- sample.int(Nmc, Nmc, replace = TRUE, prob = weight)
+      new.draw <- sample.int(Nmc, Nmc, replace = TRUE, prob = weights)
       
       # new parameters
       params <- params[new.draw, ]
@@ -300,118 +304,69 @@ for (t in 2:(365 * 2)) {
       # store parameters
       params.hist[[index]] <- params
       
-      # new initial conditions
-      ic <- pred.full[, new.draw]
+      # new predicted totals
+      pred.total.draw <- pred.total[new.draw]
       
-      cat("Initial Condition range:", range(colSums(ic)))
+      # mice we know are alive
+      mice.1 <- which(obs == 1)
+      
+      # new initial conditions
+      ic <- matrix(0, length(obs)*4, Nmc)
+      for(i in 1:Nmc){
+        ic[1:length(obs),] <- obs
+        
+        # inflate to latent number
+        inflate <- round(pred.total[new.draw[i]] / params[i, "theta"]) - pred.total[new.draw[i]]
+        
+        new.range <- (length(obs) + 1):nrow(ic) 
+        ic[sample(new.range, inflate), i] <- 1 
+        ic[mice.1, i] <- 1
+      }
+      
+      cat("Initial Condition range:", range(colSums(ic)), "\n")
+      cat("Dim IC:", dim(ic), "\n")
       
       # reset weights
-      for (i in 1:Nmc) {
-        log.like[i, 1:index] <- 0
-      }
+      like <- matrix(1, Nmc, length(future.obs.index))
+      
+      # weights for ncdf
+      weight.ncdf <- rep(1, Nmc)
     }
   } else {
-    # initial condition when no new observation
-    # is the one-day ahead forecast
-    # ic <- fore[1,,,2]
     
-    
-    # add a day to forecast
-    n.days <- n.days + 1
-    days.since.obs <- days.since.obs + 1
+    n.days <- n.days + 1 # add a day to forecast
+    days.since.obs <- days.since.obs + 1 # add days since last observation
   }
-}
-
-par(mfrow = c(3, 3))
-hist(params.hist[[1]][, "lambda.mean"])
-for (i in 2:9) {
-  hist(params.hist[[i]][, "lambda.mean"], main = i)
-}
-
-Nmc.normalized <- store.forecast.Nmc
-quants <- c(0.025, 0.25, 0.5, 0.75, 0.975)
-
-diff.2 <- which(diff(future.obs.index) != 1)
-one.day.index <- future.obs.index[diff.2]
-two.day.index <- one.day.index + 1
-other.index <- one.day.index - 1
-
-grab.index <- sort(c(one.day.index, two.day.index, other.index))
-grab.index <- grab.index[grab.index < 210]
-
-plot.latent <- Nmc.normalized[[2]][1, , , 2]
-plot.obs <- Nmc.normalized[[2]][2, , , 2]
-
-day.sum <- quantile(colSums(plot.latent), quants)
-
-for (d in 3:length(grab.index)) {
-  grab <- grab.index[d]
   
-  # only want second day of forecast
-  if (grab %in% one.day.index) {
-    plot.latent <- Nmc.normalized[[grab]][1, , , 2]
-    plot.obs <- Nmc.normalized[[grab]][2, , , 2]
-    
-    day <- quantile(colSums(plot.latent), quants)
-    day.sum <- rbind(day.sum, day)
-    
-  } else if (grab %in% (two.day.index)) {
-    plot.latent <- Nmc.normalized[[grab]][1, , , 2]
-    plot.obs <- Nmc.normalized[[grab]][2, , , 2]
-    
-    day <- quantile(colSums(plot.latent), quants)
-    day.sum <- rbind(day.sum, day)
-    
-  } else {
-    last.day <- dim(Nmc.normalized[[grab]])[4]
-    plot.latent <- Nmc.normalized[[grab]][1, , , 2:last.day]
-    plot.obs <- Nmc.normalized[[grab]][2, , , 2:last.day]
-    
-    
-    for (t in 2:dim(plot.latent)[3]) {
-      day <- quantile(colSums(plot.latent[, , t]), quants)
-      day.sum <- rbind(day.sum, day)
-    }
-  }
-}
-str(day.sum)
-
-mice.index <- future.obs.index[future.obs.index <= grab]
-mice.2.plot <- mice.observed[1:length(mice.index)]
-
-mice.vec <- rep(NA, nrow(day.sum))
-mice.vec[mice.index] <- mice.2.plot
-
-plot(1:nrow(day.sum),
-     day.sum[, 5],
-     pch = "",
-     ylim = c(0, max(day.sum) + 5))
-ciEnvelope(1:nrow(day.sum), day.sum[, 1], day.sum[, 5], col = "lightblue")
-lines(1:nrow(day.sum), day.sum[, 3])
-points(1:nrow(day.sum), mice.vec)
-
-
-for (i in 1:length(params.hist)) {
-  d <- quantile(params.hist[[i]][, "lambda.mean"])
-  print(d)
+  # name file
+  ncfname <- paste(t, "Mouse_hindcast_pf.nc", sep = "_")
+  
+  # cat("Forecast dimensions", dim(all.fore), "\n")
+  # cat("Days", n.days, "\n")
+  # cat("Ens", Nmc, "\n")
+  
+  # write netCDF
+  source("Functions/create_ncdf_mouse.R")
+  create_ncdf_mouse(file.path(dir,ncfname),
+                    all.fore,
+                    forecast_issue_time,
+                    dim(all.fore)[4],
+                    Nmc,
+                    data_assimilation,
+                    weight.ncdf,
+                    ForecastProject_id,
+                    Forecast_id,
+                    forecast_issue_time)
 }
 
+save(params.hist, resample, future.obs.index,
+     file = file)
 
-boxplot(ens.store)
+cat("Cluster stopped\n")
+cat("--- END ---\n")
 
-end <- length(ens.store)
+# stop clusters
+# parallel::stopCluster(cl)
+# showConnections()
 
-points(1:end, mice.observed[1:end], pch = 16, col = "blue")
 
-ens <- ens.store[[2]]
-ens <- ens[ens >= quantile(ens, 0.025) & ens <= quantile(ens, 0.975)]
-
-plot(2:end, pch = "", ylim = c(0, max(mice.observed) + 5))
-points(rep(2, length(ens)), ens, pch = 18)
-
-for (i in 3:length(ens.store)) {
-  ens <- ens.store[[i]]
-  ens <- ens[ens >= quantile(ens, 0.025) & ens <= quantile(ens, 0.975)]
-  points(rep(i, length(ens)), ens, pch = 18)
-}
-points(2:end, mice.observed[2:36], pch = 16, col = "red")
