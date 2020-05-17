@@ -1,5 +1,8 @@
 mouse_forecast <- function(days, params, ic, precip, temp){
   
+  library(boot)
+  library(mvtnorm)
+  
   Nmc <- nrow(params)
   
   # hindcast/forecast settings
