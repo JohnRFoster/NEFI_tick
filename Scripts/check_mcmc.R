@@ -1,18 +1,38 @@
 library(ecoforecastR)
 library(runjags)
 
-## Independent Models ##
-sites <- c("Green", "Henry", "Tea")
-num.out <- c(10, 9, 20)
+source("Functions/split_out.R")
+type <- "ind"
+# type <- "hb"
 
-# read array job number to paste into output file
-xx <- as.numeric(Sys.getenv("SGE_TASK_ID")) 
 
-site <- sites[xx]
-num.out <- num.out[xx]
 
-dir <- paste0("../FinalOut/A_Correct/ObsModel/Obs.Obs.ObsVert/", site)
-model <- paste0("Obs_L1.N1.A2vert_", site, "Control")
+if(type == "ind"){
+  ## Independent Models ##
+  sites <- c("Green", "Henry", "Tea")
+  
+  start <- 1
+  num.out <- c(27, 27, 27)
+  
+  # read array job number to paste into output file
+  xx <- as.numeric(Sys.getenv("SGE_TASK_ID")) 
+  
+  site <- sites[xx]
+  num.out <- num.out[xx]
+  
+  dir <- paste0("../FinalOut/A_Correct/ObsProcModels/Obs_L1N0A0.Proc_NymphRh/", site)
+  model <- paste0("Obs_L1N0A0.Proc_NymphRH_", site, "Control")
+  # model.save <- paste0("Obs_L1N0A0.Proc_AdultVPD_VPDDiff_", site, "Control")
+  model.save <- model
+} else if(type == "hb"){
+  
+  dir <- "../FinalOut/A_Correct/NULL_HB"
+  model <- "NullObs_HB_K_set"
+  continue <- TRUE
+  start <- 10
+  num.out <- 17
+}
+
 
 # dir <- paste0("../FinalOut/HB_Obs1_Proc1/VPDProc")
 # model <- paste0("VPD_ObsProc_beta_111_K_set")
@@ -25,10 +45,10 @@ iter.run <- 100000 # number of iterations in each 'out' segment
 num.chains <- c(1, 2, 3, 4, 5)
 
 
-gbr.thresh <- 1.01
+gbr.thresh <- 1.03
 min.effect.size <- 4000
 
-force <- FALSE
+force <- TRUE
 cat("force =", force, "\n")
 
 total.iter <- iter.run * num.out
@@ -43,12 +63,18 @@ spacer <- "_" # for tick models
 params <- list()
 for(c in seq_along(num.chains)){
   c.load <- num.chains[c]
-  load <- paste0(load.dir, c.load, spacer, 1, ".RData")
+  load <- paste0(load.dir, c.load, spacer, start, ".RData")
   load(load)
+  # if(continue){
+  #   out <- split_out(jags.out)
+  # }
   chain <- out$out$params
-  for(i in 2:num.out){
+  for(i in (start+1):num.out){
     load <- paste0(load.dir, c.load, spacer, i, ".RData")
     load(load)
+    # if(continue){
+    #   out <- split_out(jags.out)
+    # }
     chain <- combine.mcmc(mcmc.objects = list(chain, out$out$params))
     if(i %% 5 == 0){
       cat(i, "segments combined\n")
@@ -137,7 +163,7 @@ if((!is.na(burnin) & converge & enough.samples) | force){
   predict.burn <- as.mcmc.list(predict)
   # m.burn <- as.mcmc.list(m.cols)
   
-  file <- paste0("Combined_BURN_", model, ".RData")
+  file <- paste0("Combined_BURN_", model.save, ".RData")
   save(params.burn, predict.burn, # m.burn,
        file = file.path(dir, file))
   cat("Burned-in mcmc file saved\n")
@@ -153,7 +179,7 @@ if((!is.na(burnin) & converge & enough.samples) | force){
   predict.mat <- predict.mat[thin,]
   # m.mat <- m.mat[thin,]
   
-  file <- paste0("Combined_thinMat_", model, ".RData") 
+  file <- paste0("Combined_thinMat_", model.save, ".RData") 
   save(params.mat, predict.mat, # m.mat,
        file = file.path(dir, file))
   cat("Burned-in thinned matrix saved\n")
