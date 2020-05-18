@@ -36,7 +36,7 @@ if(grid == "Henry Control") load("../FinalOut/HenryControlMR/HenryControlMR_1_6.
 if(grid == "Tea Control") load("../FinalOut/TeaControlMR/TeaControlMR_1_6.RData")
 
 params <- as.matrix(jags.out)
-Nmc.per.node <- 125
+Nmc.per.node <- 25
 Nmc <- Nmc.per.node * n.slots
 draw <- sample.int(nrow(params), Nmc)
 params <- params[draw, ]
@@ -68,6 +68,16 @@ met$date <- as.character(met$date)
 start.date <- as.character(days[1])
 start.index <- match(start.date, met$date)
 met <- met[start.index:nrow(met), ]
+
+# calculate and store daily survival
+lambda <- matrix(NA, Nmc, nrow(met))
+for (d in 1:Nmc) {
+  lambda[d,] <- inv.logit(params[d, "lambda.mean"] +
+                          params[d, "beta[1]"] * met$precip +
+                          params[d, "beta[2]"] * met$temp.scale)
+}
+
+
 
 ## first initial conditions is first observation of 2006
 current.date <- days[1]
@@ -106,8 +116,8 @@ forecast.start.index <- 2
 days.since.obs <- 0
 weight.ncdf <- rep(1, Nmc) # weights for ncdf
 
-for (t in 1:length(days)) {
-# for (t in 1:8) {
+# for (t in 1:length(days)) {
+for (t in 1:8) {
 
   ### forecast step ###
   forecast_issue_time <- as.Date(days[t])
@@ -129,15 +139,6 @@ for (t in 1:length(days)) {
     select(temp.scale)
   
   n.days <- nrow(temp) # number of days in forecast
-  
-  # calculate and store daily survival
-  lambda.forecast <- matrix(NA, Nmc, nrow(temp))
-  for (d in 1:nrow(temp)) {
-    lambda.forecast[, d] <- inv.logit(params[, "lambda.mean"] +
-                                      params[, "beta[1]"] * precip[d, 1] +
-                                      params[, "beta[2]"] * temp[d, 1])
-  }
-  lambda <- cbind(lambda, lambda.forecast[,1:check.day])
   
   # run forecast in parallel
   cl <- makeCluster(n.slots) # start cluster 
@@ -277,22 +278,30 @@ for (t in 1:length(days)) {
     
     like <- matrix(1, Nmc, length(future.obs.index)) # reset weights
     weight.ncdf <- rep(1, Nmc) # weights for ncdf
+    
+    # re-calculate and store daily survival
+    lambda <- matrix(NA, Nmc, nrow(met))
+    for (d in 1:Nmc) {
+      lambda[d,] <- inv.logit(params[d, "lambda.mean"] +
+                                params[d, "beta[1]"] * met$precip +
+                                params[d, "beta[2]"] * met$temp.scale)
+    }
   }
   
   ncfname <- paste(t, "Mouse_hindcast_pf.nc", sep = "_") # name file
   
   # write netCDF
-  create_ncdf_mouse(
-    file.path(dir, ncfname),
-    all.fore,
-    forecast_issue_time,
-    dim(all.fore)[4],
-    Nmc,
-    data_assimilation,
-    weight.ncdf,
-    ForecastProject_id,
-    Forecast_id,
-    forecast_issue_time)
+  # create_ncdf_mouse(
+  #   file.path(dir, ncfname),
+  #   all.fore,
+  #   forecast_issue_time,
+  #   dim(all.fore)[4],
+  #   Nmc,
+  #   data_assimilation,
+  #   weight.ncdf,
+  #   ForecastProject_id,
+  #   Forecast_id,
+  #   forecast_issue_time)
 }
 
 save(params.hist, resample, future.obs.index,
