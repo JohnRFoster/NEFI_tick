@@ -36,7 +36,7 @@ if(grid == "Henry Control") load("../FinalOut/HenryControlMR/HenryControlMR_1_6.
 if(grid == "Tea Control") load("../FinalOut/TeaControlMR/TeaControlMR_1_6.RData")
 
 params <- as.matrix(jags.out)
-Nmc.per.node <- 25
+Nmc.per.node <- 125
 Nmc <- Nmc.per.node * n.slots
 draw <- sample.int(nrow(params), Nmc)
 params <- params[draw, ]
@@ -104,30 +104,23 @@ for(i in 1:Nmc){
 cat("Initial Condition range:", range(colSums(ic)), "\n")
 
 t <- 2 # for testing
-n.days <- 16
-index <- 1
-weights <- rep(1, Nmc)
 like <- matrix(1, Nmc, length(future.obs.index))
-data_assimilation <- 0
-store.forecast.Nmc <- ens.store <- all.forecasts <- list()
-lambda <- matrix(1, Nmc, 1)
 resample <- rep(NA, length(future.obs.index))
-forecast.start.index <- 2
-days.since.obs <- 0
 weight.ncdf <- rep(1, Nmc) # weights for ncdf
+index <- 1
+check.day <- rep(NA, length(days))
 
-# for (t in 1:length(days)) {
-for (t in 1:8) {
+for (t in 1:length(days)) {
 
   ### forecast step ###
   forecast_issue_time <- as.Date(days[t])
   forecast.start.day <- as.character(days[t])  # date forecast issued
   forecast.end.day <- as.character(days[t+1])  # next observation date
-  check.day <- as.integer(days[t+1] - days[t]) # day we evaluate forecast and run DA
-  check.day <- max(2, check.day) # one-day forecasts evaluate 2 index as first is ic
+  check.day[t] <- as.integer(days[t+1] - days[t]) # day we evaluate forecast and run DA
+  check.day[t] <- max(2, check.day[t]) # one-day forecasts evaluate 2 index as first is ic
   
   # always make at least 16-day forecast
-  if(check.day < 16)  forecast.end.day <- as.character(days[t] + 16)
+  if(check.day[t] < 16)  forecast.end.day <- as.character(days[t] + 16)
   
   # grab met
   met.subset <- met %>% 
@@ -155,6 +148,7 @@ for (t in 1:8) {
 
   ### analysis step ###
   cat("\n-----------------------\n")
+  index <- index + 1 # observation index counter
   
   loop.time <- Sys.time() - script.start
   cat("Elapsed time:\n")
@@ -173,7 +167,7 @@ for (t in 1:8) {
     if (!is.infinite(last.observed)) {
       surv.prob <- rep(NA, Nmc)
       for (m in 1:Nmc) {
-        surv.prob[m] <- prod(lambda[m, capture.day:ncol(lambda)])
+        surv.prob[m] <- prod(lambda[m, capture.day:future.obs.index[t+1]])
       }
       if (median(surv.prob) < 0.05) {
         dead <- c(dead, r)
@@ -190,8 +184,8 @@ for (t in 1:8) {
   obs.total <- sum(obs, na.rm = TRUE)  # total number observed
   
   # subset to correct day
-  pred.full <- all.fore[1, , , check.day]
-  pred.obs <- all.fore[2, , , check.day]
+  pred.full <- all.fore[1, , , check.day[t]] # predicted latent
+  pred.obs <- all.fore[2, , , check.day[t]]  # predicted observed
   
   # remove annoted mice
   if (length(obs) < nrow(pred.full)) {
@@ -209,7 +203,6 @@ for (t in 1:8) {
   # likelihood 
   cum.like <- rep(NA, Nmc) # store
   ens.like <- matrix(NA, Nmc, length(obs)) # store
-  index <- index + 1 # observation index counter
   for (i in 1:Nmc) {
     ens.like[i, ] <- dbinom(obs, 1, params[i, "theta"] * pred.latent[, i]) # likelihood
     like.mu <- mean(ens.like[i, ]) # mean weight for each ensemble
@@ -219,8 +212,8 @@ for (t in 1:8) {
   
   # normalize and store weights to determine if we resample or not
   norm.weights <- cum.like / sum(cum.like)  # normalize weights
-  like[, index] <- norm.weights # store weights to carry over
-  effect.size <- 1 / sum(norm.weights ^ 2) # effective sample size
+  like[, index] <- norm.weights             # store weights to carry over
+  effect.size <- 1 / sum(norm.weights ^ 2)  # effective sample size
   cat("Effective Sample Size:", effect.size, "\n")
   
   # no resample
@@ -289,22 +282,24 @@ for (t in 1:8) {
   }
   
   ncfname <- paste(t, "Mouse_hindcast_pf.nc", sep = "_") # name file
+  data_assimilation <- rep(0, n.days)
+  data_assimilation[check.day[t]] <- 1
   
   # write netCDF
-  # create_ncdf_mouse(
-  #   file.path(dir, ncfname),
-  #   all.fore,
-  #   forecast_issue_time,
-  #   dim(all.fore)[4],
-  #   Nmc,
-  #   data_assimilation,
-  #   weight.ncdf,
-  #   ForecastProject_id,
-  #   Forecast_id,
-  #   forecast_issue_time)
+  create_ncdf_mouse(
+    file.path(dir, ncfname),
+    all.fore,
+    forecast_issue_time,
+    dim(all.fore)[4],
+    Nmc,
+    data_assimilation,
+    weight.ncdf,
+    ForecastProject_id,
+    Forecast_id,
+    forecast_issue_time)
 }
 
-save(params.hist, resample, future.obs.index,
+save(params.hist, resample, check.day,
      file = file)
 
 cat("Cluster stopped\n")
