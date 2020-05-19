@@ -18,13 +18,13 @@ future_met <- function(site, gdd.base = 10){
   }
   
   # assign 
-  if(site == "Green Control") s <- 1
-  if(site == "Henry Control") s <- 2
-  if(site == "Tea Control") s <- 3
+  if (site == "Green Control") s <- 1
+  if (site == "Henry Control") s <- 2
+  if (site == "Tea Control") s <- 3
   
   # index for last day for site being forecasted
   last.index <- which(met$DATE == last.day[s])
-  met.seq <- last.index:nrow(met)
+  met.seq <- last.index:which(met$DATE == "2017-12-31") # all 2018 data is NA
   
   met <- met[met.seq,]
   

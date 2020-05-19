@@ -10,7 +10,7 @@ create_ncdf_mouse <- function(ncfname, n, start.date, n.days, Nmc, data_assimila
   time <- seq.Date(from = start.date, by = 1, length.out = n.days, format = "%Y")
   
   # did we assimilate data
-  data_assimilation <- rep(data_assimilation, length(time))
+  # data_assimilation <- rep(data_assimilation, length(time))
   
   # Set dimensions
   ens <- 1:Nmc               # number of ensembles
