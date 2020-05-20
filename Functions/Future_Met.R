@@ -2,7 +2,7 @@ library(lubridate)
 
 future_met <- function(site, gdd.base = 10){
   met <- read.csv("../Cary_Met_Data_Daily.csv")
-  met <- met[, c("DATE","MAX_TEMP", "MIN_TEMP", "MAX_RH","TOT_PREC")]
+  met <- met[, c("DATE","MAX_TEMP", "MIN_TEMP", "MAX_RH", "MIN_RH", "TOT_PREC")]
   met$DATE <- as.Date(as.character(met$DATE), format = c("%m/%d/%Y"))
   
   sites <- c("Green Control","Henry Control","Tea Control")
@@ -55,33 +55,33 @@ future_met <- function(site, gdd.base = 10){
     gdd.vec <- c(gdd.vec, gdd)
   }
   
-  # if na's set to mean
-  temp.scale <- scale(met$MAX_TEMP, scale = FALSE)
-  temp <- met$MAX_TEMP
-  if(any(is.na(temp))){
-    na.temp <- which(is.na(temp))
-    temp.scale[na.temp] <- mean(temp.scale, na.rm = TRUE)
-    temp[na.temp] <- mean(temp, na.rm = TRUE)
+  # if na's set to mean and scale, return both
+  scale_mean <- function(vec){
+    scale.vec <- scale(vec, scale = FALSE)
+    if(any(is.na(vec))){
+      na <- which(is.na(vec))
+      scale.vec[na] <- mean(scale.vec, na.rm = TRUE)
+      vec[na] <- mean(vec, na.rm = TRUE)
+    }
+    return(list(var.scale = as.vector(scale.vec),
+                var = vec))
   }
-  precip <- met$TOT_PREC
-  if(any(is.na(precip))){
-    na.precip <- which(is.na(precip))
-    precip[na.precip] <- mean(precip, na.rm = TRUE)
-  }
-  rh.scale <- scale(met$MAX_RH, scale = FALSE)
-  rh <- met$MAX_RH
-  if(any(is.na(rh))){
-    na.rh <- which(is.na(rh))
-    rh.scale[na.rh] <- mean(rh.scale, na.rm = TRUE)
-    rh[na.rh] <- mean(rh, na.rm = TRUE)
-  }
-  
+  max.temp <- scale_mean(met$MAX_TEMP)
+  min.temp <- scale_mean(met$MIN_TEMP)
+  max.rh <- scale_mean(met$MAX_RH)
+  min.rh <- scale_mean(met$MIN_RH)
+  precip <- scale_mean(met$TOT_PREC)
+
   # create data frame
-  future.met <- data.frame(temp = temp,
-                           temp.scale = temp.scale,
-                           precip = precip,
-                           rh = rh,
-                           rh.scale = rh.scale,
+  future.met <- data.frame(max.temp = max.temp$var,
+                           max.temp.scale = max.temp$var.scale,
+                           min.temp = min.temp$var,
+                           min.temp.scale = min.temp$var.scale,
+                           max.rh = max.rh$var,
+                           max.rh.scale = max.rh$var.scale,
+                           min.rh = min.rh$var,
+                           min.rh.scale = min.rh$var.scale,
+                           precip = precip$var,
                            cum.gdd = cum.gdd,
                            year.index = met$year,
                            date = met$DATE)
