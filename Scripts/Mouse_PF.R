@@ -14,9 +14,9 @@ source("Functions/new_mouse_observation.R")
 
 # Forecast_id <- uuid::UUIDgenerate() # ID that applies to the specific forecast
 Forecast_id <- "05cf9022-6ea7-415f-88b7-c4f546a596a0"
-ForecastProject_id <- 20200414 # Some ID that applies to a set of forecasts
+ForecastProject_id <- 20200519 # Some ID that applies to a set of forecasts
 
-grid <- "Green Control"
+grid <- "Tea Control"
 grid.short <- gsub(" Control", "", grid)
 
 dir <- file.path("../FinalOut/DA_Runs/Mouse_Hindcast", grid.short)
@@ -48,7 +48,7 @@ cat(Nmc, " total ensembles\n")
 params.hist <- list()
 params.hist[[1]] <- params
 
-mice.future <- suppressWarnings(mice_06_18("Green Control"))
+mice.future <- suppressWarnings(mice_06_18(grid))
 mice <- mice.future$table
 ch <- mice.future$full.matrix
 mice.observed <- colSums(ch)
@@ -56,6 +56,7 @@ mice.observed <- colSums(ch)
 day.1 <- as.character(unique(mice$Full.Date.1)) # 1st capture date of sampling occasion
 day.2 <- as.character(unique(mice$Full.Date.2)) # 2nd capture date of sampling occasion
 days <-  ymd(c(rbind(day.1, day.2))) # vector of unique trapping days (for colnames)
+days <- days[days <= "2017-12-31"] # run hindcast through 2017 only, 2018 met data is NA
 diff.days <- diff(days)
 forecast.time.step <- pmax(16, diff(days)) # days to forecast
 
@@ -110,7 +111,7 @@ weight.ncdf <- rep(1, Nmc) # weights for ncdf
 index <- 1
 check.day <- rep(NA, length(days))
 
-for (t in 1:length(days)) {
+for (t in 1:(length(days)-1)) {
 
   ### forecast step ###
   forecast_issue_time <- as.Date(days[t])
@@ -151,7 +152,7 @@ for (t in 1:length(days)) {
   index <- index + 1 # observation index counter
   
   loop.time <- Sys.time() - script.start
-  cat("Elapsed time:\n")
+  cat("Elapsed time after", t, "forecasts\n")
   print(loop.time)
   cat(future.obs.index[t], "days forecasted \n")
   
@@ -302,7 +303,7 @@ for (t in 1:length(days)) {
 save(params.hist, resample, check.day,
      file = file)
 
-cat("Cluster stopped\n")
+cat("Parameters saved\n")
 cat("--- END ---\n")
 
 # stop clusters
