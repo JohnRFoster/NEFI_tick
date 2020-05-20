@@ -69,7 +69,7 @@ predict_one <- function(type, site, met.variable, params, ic, data, A_func){
       for(day in seq.days[t,2:df[t]]){
         A.agg[1:3,1:3,day] <- A.agg[1:3,1:3,day+1] %*% A[,,day,m]
       }
-      
+ 
       ## initial condition
       l <- ua$IC[m, paste("x[1,",t,"]",sep="")]
       n <- ua$IC[m, paste("x[2,",t,"]",sep="")]
