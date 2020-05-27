@@ -1,6 +1,7 @@
 library(LaplacesDemon)
 library(plantecophys)
 library(ecoforecastR)
+library(tidyverse)
 
 script.start <- Sys.time()
 
@@ -11,12 +12,23 @@ source("Functions/obs_prob.R")
 source("Functions/Future_Met.R")
 source("Functions/get_ticks_2006_2018.R")
 source("Functions/tick_forecast.R")
+source("Functions/create_ncdf_tick.R")
 
 # Forecast_id <- uuid::UUIDgenerate() # ID that applies to the specific forecast
 Forecast_id <- "601144a5-ed57-4166-b943-38bfd66f9081"
-ForecastProject_id <- 20200519 # Some ID that applies to a set of forecasts
+ForecastProject_id <- 20200520 # Some ID that applies to a set of forecasts
 
-grid <- "Green Control" # full site name
+## read array job number to paste into output file
+# grid.id <- as.numeric(Sys.getenv("SGE_TASK_ID"))
+grid.id <- 1 # for test
+
+# full site name, match to array job number
+if(grid.id == 1) grid <- "Green Control" 
+if(grid.id == 2) grid <- "Henry Control" 
+if(grid.id == 3) grid <- "Tea Control" 
+
+cat("\n--Running Tick Hindcast for", grid, "--\n")
+
 grid.short <- gsub(" Control", "", grid) # site sub directory name
 grid.no.space <- gsub(" ", "", grid) # site name without spaces
 
@@ -37,7 +49,7 @@ load(file.path(in.dir,
                grid.short, 
                model.name))
 
-Nmc <- 100
+Nmc <- 1000
 draw <- sample.int(nrow(params.mat), Nmc, replace = TRUE)
 params <- params.mat[draw,]
 states <- predict.mat[draw,]
@@ -91,19 +103,20 @@ resample <- rep(NA, length(days))
 weight.ncdf <- rep(1, Nmc) # weights for ncdf
 index <- 1
 check.day <- rep(NA, length(days))
+quants <- c(0.025, 0.25, 0.5, 0.75, 0.975)
 
-# for (t in 1:(length(days)-1)) {
-for (t in 1:10) {
+for (t in 1:(length(days)-1)) {
+# for (t in 1:10) {
   
   ### forecast step ###
   forecast_issue_time <- as.Date(days[t])
   forecast.start.day <- as.character(days[t])  # date forecast issued
-  forecast.end.day <- as.character(days[t+1])  # next observation date
+  forecast.end.day <- as.character(days[t+1]+16)  # next observation date
   check.day[t] <- as.integer(days[t+1] - days[t]) # day we evaluate forecast and run DA
   check.day[t] <- max(2, check.day[t]) # one-day forecasts evaluate 2 index as first is ic
   
   # always make at least 16-day forecast
-  if(check.day[t] < 16)  forecast.end.day <- as.character(days[t] + 16)
+  # if(check.day[t] < 16)  forecast.end.day <- as.character(days[t] + 16)
   
   # grab met
   met.subset <- met %>% 
@@ -120,6 +133,7 @@ for (t in 1:10) {
   
   fore <- tick_forecast(params, ic, gdd, met.data, obs.temp, n.days) # run forecast
   predict <- fore[,check.day[t],] # pull out prediction for DA
+  predict[predict == 0] <- 1E-10  # need to converte 0s for log.like calculation
   
   ### analysis step ###
   cat("\n-----------------------\n")
@@ -133,37 +147,50 @@ for (t in 1:10) {
   observation <- ticks.observed[,index] # ticks observed
   
   cat("\nLarva prediction summary:\n")
-  print(summary(predict[1,]))
+  print(round(quantile(predict[1,], quants)))
   cat("Larva observed", observation[1], "\n")
   cat("\nNymph prediction summary:\n")
-  print(summary(predict[2,]))
+  print(round(quantile(predict[2,], quants)))
   cat("Nymph observed", observation[2], "\n")
   cat("\nAdult prediction summary:\n")
-  print(summary(predict[3,]))
+  print(round(quantile(predict[3,], quants)))
   cat("Adult observed", observation[3], "\n\n")
   
-  obs.prob <- obs_prob(ua, check.day[t], obs.temp[,1]) # observation probability for zero inflation
+  obs.prob <- obs_prob(ua, 1, obs.temp[check.day[t],1]) # observation probability for zero inflation
   obs.prob.mat <- matrix(NA, 3, Nmc) # storage 
-  obs.prob.mat[1,] <- obs.prob$theta.larva[,check.day[t]]
-  obs.prob.mat[2,] <- obs.prob$theta.nymph[,check.day[t]]
-  obs.prob.mat[3,] <- obs.prob$theta.adult[,check.day[t]]
+  obs.prob.mat[1,] <- obs.prob$theta.larva[,1]
+  obs.prob.mat[2,] <- obs.prob$theta.nymph[,1]
+  obs.prob.mat[3,] <- obs.prob$theta.adult[,1]
   
   # likelihood 
   cum.like <- rep(NA, Nmc) # store
   ens.like <- matrix(NA, Nmc, 3) # store
   for (i in 1:Nmc) {
-    ens.like[i, ] <- dgpois(observation, predict[,i], 1-obs.prob.mat[,i]) # likelihood
-    like.mu <- mean(ens.like[i, ]) # mean weight for each ensemble
-    like[i, index] <- like.mu # store
-    cum.like[i] <- prod(like[i, 1:index]) # convert to cumulative likelihood (weights)
+    omega <- 1 - min(obs.prob.mat[,i], 1)
+    ens.like[i, ] <- dgpois(observation, predict[,i], omega, log = T) # likelihood
+    # like.mu <- exp(mean(ens.like[i, ])) # mean weight for each ensemble
+    # like[i, index] <- like.mu # store
+    # cum.like[i] <- prod(like[i, 1:index]) # convert to cumulative likelihood (weights)
   }
   
+  norm.life.stage <- apply(ens.like, 2, function(x) exp(x) / sum(exp(x)))
+  norm.weights <- rowMeans(norm.life.stage)
+  print(sum(norm.weights))
+
   # normalize and store weights to determine if we resample or not
-  norm.weights <- cum.like / sum(cum.like)  # normalize weights
-  like[, index] <- norm.weights             # store weights to carry over
+  # norm.weights <- cum.like / sum(cum.like)  # normalize weights
+  # like[, index] <- norm.weights             # store weights to carry over
   effect.size <- 1 / sum(norm.weights ^ 2)  # effective sample size
   cat("Effective Sample Size:", effect.size, "\n")
   
+  # logL = rep(NA, Nmc)
+  # for (i in 1:Nmc) {
+  #   logL[i] = mean(dgpois(observation, predict[,i], 1-obs.prob.mat[,i], log = T))
+  # }
+  # norm.weights = exp(logL) / sum(exp(logL))  ## weight each run
+  # effect.size <- 1 / sum(norm.weights ^ 2)  # effective sample size
+  # cat("Effective Sample Size:", effect.size, "\n")
+
   # no resample
   if (effect.size > (Nmc / 2)) {
     cat("Resample: FALSE \n")
@@ -174,14 +201,18 @@ for (t in 1:10) {
     ic <- matrix(NA, Nmc, 3) # store
     for(i in 1:3){
       wtd.quant[i,] <- wtd.quantile(predict[i,], 
-                                    cum.like / mean(cum.like),
+                                    norm.weights / mean(norm.weights),
                                     c(0.025,0.025,0.5,0.75,0.975))
       ic[,i] <- sample(wtd.quant[i,], Nmc, replace = TRUE)
     }
+    
     ic[ic < 1] <- 0
-    cat("Larva initial condition range:", range(ic[,1]), "\n")
-    cat("Nymph initial condition range:", range(ic[,2]), "\n")
-    cat("Adult initial condition range:", range(ic[,3]), "\n")
+    cat("Larva initial condition summary:", 
+        round(quantile(ic[,1], quants)), "\n")
+    cat("Nymph initial condition range:", 
+        round(quantile(ic[,2], quants)), "\n")
+    cat("Adult initial condition range:",
+        round(quantile(ic[,3], quants)), "\n")
     
   } else { # resample
   
@@ -189,18 +220,69 @@ for (t in 1:10) {
     resample[index] <- TRUE
     
     new.draw <- sample.int(Nmc, Nmc, replace = TRUE, prob = norm.weights) # resample with replacement
-    params <- params[new.draw,] # new parameters
-    params.hist[[index]] <- params # store parameters
-    ic <- t(predict[,new.draw]) # new initial conditions
-    ic[ic < 1] <- 0
+    print(head(new.draw))
+    params.new <- params[new.draw,-c(1:9)] # new parameters
+    params.new.sigma <- params[new.draw,1:9] # grab prec matrix elements
+    new.states <- t(predict[,new.draw]) # new initial conditions
     
-    cat("Larva initial condition range:", range(ic[,1]), "\n")
-    cat("Nymph initial condition range:", range(ic[,2]), "\n")
-    cat("Adult initial condition range:", range(ic[,3]), "\n")
+    X <- cbind(new.states, params.new) # combine states and parameters
+    Xbar <- apply(X, 2, mean)      # mean after resampling
+    SIGMA <- cov(t(t(X) / Xbar))   # covariance matrix, normalized to the mean
+    
+    ## Kernel smoothing (to avoid ensemble members with identical parameters)
+    h <- 0.9
+    e <- rmvnorm(n = Nmc, mean = rep(0, ncol(X)), sigma = SIGMA)
+    Xstar = t(Xbar + h*(t(X)-Xbar) + t(e)*Xbar*(1-h))
+    
+    
+    # ic after smoothing
+    ic <- matrix(NA, Nmc, 3)
+    for (i in 1:3) ic[, i] <- round(pmax(Xstar[, i], 0)) ## ticks are discrete and positive
+    
+    # ic <- new.states
+    
+    cat("Larva initial condition summary:", 
+        round(quantile(ic[,1], quants)), "\n")
+    cat("Nymph initial condition range:", 
+        round(quantile(ic[,2], quants)), "\n")
+    cat("Adult initial condition range:",
+        round(quantile(ic[,3], quants)), "\n")
+    
+    # parameters after smoothing
+    params <- cbind(params.new.sigma, Xstar[,-c(1:3)])
+    params.hist[[index]] <- params # store parameters
     
     like <- matrix(1, Nmc, length(days)) # reset weights
-    weight.ncdf <- rep(1, Nmc) # weights for ncdf
+    weight.ncdf <- rep(1, Nmc) # weights for ncdf and reset
     ua <- ua_parts(params, ic, c("parameter", "ic", "process")) # new uncertainty partitioning
   }
+  
+  ncfname <- paste(t, "Tick_hindcast_pf.nc", sep = "_") # name file
+  data_assimilation <- rep(0, n.days)
+  data_assimilation[check.day[t]] <- 1
+  
+  # write netCDF
+  create_ncdf_tick(
+    file.path(out.dir, ncfname),
+    fore,
+    forecast_issue_time,
+    n.days,
+    Nmc,
+    data_assimilation,
+    weight.ncdf,
+    ForecastProject_id,
+    Forecast_id,
+    forecast_issue_time)
 }
 
+# par(mfrow=c(2,3))
+# hist(params.hist[[1]][,10])
+# for(i in 2:6){
+#   hist(params.hist[[i]][,10])
+# }
+
+save(params.hist, resample, check.day,
+     file = file.path(out.dir, param.name))
+
+cat("Parameters saved\n")
+cat("--- END ---\n")
