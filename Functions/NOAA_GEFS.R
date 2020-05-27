@@ -1,27 +1,24 @@
 library(rnoaa)
-
+library(plantecophys)
 
 lat.in <- 41.7851 
-lon.in <- 73.7338
-outfolder <- "../GEFS/"
+lon.in <- -73.7338
+sitename <- "CaryInstitute"
+outfolder <- "../GEFS/Cary"
+tz="America/New_York"
 
 # will need to download all time forcasts (every six hours)
 # so that I can grab max and min
 
 # will need to convert rh and tempt to vpd
 
-
-
-test <- gefs(noaa_var_names[1], cary.lat, cary.lon,
-             forecast_time = "1200",
-             time_idx = c(4,8,12,16,20,24))
+NOAA_GEFS <- function(outfolder, lat.in, lon.in, sitename, 
+                      start_date = Sys.time(), 
+                      end_date = (as.POSIXct(start_date, tz=tz) + lubridate::days(16)),
+                      overwrite = FALSE, verbose = FALSE, ...) {
   
-
-NOAA_GEFS <- function(outfolder, lat.in, lon.in, sitename, start_date = Sys.time(), end_date = (as.POSIXct(start_date, tz="UTC") + lubridate::days(16)),
-                                         overwrite = FALSE, verbose = FALSE, ...) {
-  
-  start_date <- as.POSIXct(start_date, tz = "UTC")
-  end_date <- as.POSIXct(end_date, tz = "UTC")
+  start_date <- as.POSIXct(start_date, tz = tz)
+  end_date <- as.POSIXct(end_date, tz = tz)
   
   #It takes about 2 hours for NOAA GEFS weather data to be posted.  Therefore, if a request is made within that 2 hour window,
   #we instead want to adjust the start time to the previous forecast, which is the most recent one avaliable.  (For example, if
@@ -65,7 +62,7 @@ NOAA_GEFS <- function(outfolder, lat.in, lon.in, sitename, start_date = Sys.time
   
   # Recreate the adjusted start and end dates.
   start_date = as.POSIXct(paste0(lubridate::year(start_date), "-", lubridate::month(start_date), "-", lubridate::day(start_date), " ", 
-                                 substring(forecast_hour, 1,2), ":00:00"), tz="UTC")
+                                 substring(forecast_hour, 1,2), ":00:00"), tz=tz)
   
   end_date = start_date + lubridate::hours(increments * 6)
   
@@ -73,10 +70,10 @@ NOAA_GEFS <- function(outfolder, lat.in, lon.in, sitename, start_date = Sys.time
   # Bounds date checking
   # NOAA's GEFS database maintains a rolling 12 days of forecast data for access through this function.
   # We do want Sys.Date() here - NOAA makes data unavaliable days at a time, not forecasts at a time.
-  NOAA_GEFS_Start_Date = as.POSIXct(Sys.Date(), tz="UTC") - lubridate::days(11)  #Subtracting 11 days is correct, not 12.
+  NOAA_GEFS_Start_Date = as.POSIXct(Sys.Date(), tz=tz) - lubridate::days(11)  #Subtracting 11 days is correct, not 12.
   
   # Check to see if start_date is valid. This must be done after date adjustment.
-  if (as.POSIXct(Sys.time(), tz="UTC") < start_date || start_date < NOAA_GEFS_Start_Date) {
+  if (as.POSIXct(Sys.time(), tz=tz) < start_date || start_date < NOAA_GEFS_Start_Date) {
     PEcAn.logger::logger.severe(sprintf('Start date (%s) exceeds the NOAA GEFS range (%s to %s).',
                                         start_date,
                                         NOAA_GEFS_Start_Date, Sys.Date()))
@@ -101,28 +98,28 @@ NOAA_GEFS <- function(outfolder, lat.in, lon.in, sitename, start_date = Sys.time
                      "Relative_humidity_height_above_ground_ens", 
                      "Total_precipitation_surface_6_Hour_Accumulation_ens")
   
-  # cf_var_names = noaa_var_names
-  
-  # These are the cf standard names
-  # cf_var_names1 = c("air_temperature", "air_pressure", "specific_humidity", "surface_downwelling_longwave_flux_in_air", 
-                    "surface_downwelling_shortwave_flux_in_air", "precipitation_flux", "wind_speed")
-  # cf_var_units = c("K", "Pa", "1", "Wm-2", "Wm-2", "kgm-2s-1", "ms-1")  #Negative numbers indicate negative exponents
+  cf_var_names = noaa_var_names
+  cf_var_units = c("C", "C", "percent", "precent", "kPa")  #Negative numbers indicate negative exponents
   
   # This debugging loop allows you to check if the cf variables are correctly mapped to the equivalent
   # NOAA variable names.  This is very important, as much of the processing below will be erroneous if 
   # these fail to match up.
-  # for (i in 1:length(cf_var_names)) {
-  #  print(sprintf("cf / noaa   :   %s / %s", cf_var_names[[i]], noaa_var_names[[i]]))
-  #}
+  for (i in 1:length(cf_var_names)) {
+   print(sprintf("cf / noaa   :   %s / %s", cf_var_names[[i]], noaa_var_names[[i]]))
+  }
   
   noaa_data = list()
   
   #Downloading the data here.  It is stored in a matrix, where columns represent time in intervals of 6 hours, and rows represent
   #each ensemble member.  Each variable getxs its own matrix, which is stored in the list noaa_data.
   
-  
   for (i in 1:length(noaa_var_names)) {
-    noaa_data[[i]] = rnoaa::gefs(noaa_var_names[i], lat.in, lon.in, raw=TRUE, time_idx = seq_len(increments), forecast_time = forecast_hour, date=format(start_date, "%Y%m%d"))$data
+    noaa_data[[i]] = rnoaa::gefs(noaa_var_names[i], 
+                                 lat.in, lon.in, 
+                                 raw=TRUE, 
+                                 time_idx = seq_len(increments), 
+                                 forecast_time = forecast_hour, 
+                                 date=format(start_date, "%Y%m%d"))$data
   }
   
   #Fills in data with NaNs if there happens to be missing columns.
@@ -139,51 +136,8 @@ NOAA_GEFS <- function(outfolder, lat.in, lon.in, sitename, start_date = Sys.time
     }
   }
   
-  ###################################################
-  # Not all NOAA data units match the cf data standard.  In this next section, data are processed to
-  # confirm with the standard when necessary.
-  # The following is a list of variables which need to be processed:
-  # 1. NOAA's relative humidity must be converted to specific humidity
-  # 2. NOAA's measure of precipitation is the accumulation over 6 hours; cf's standard is precipitation per second
-  
-  #Convert NOAA's relative humidity to specific humidity
-  humid_index = which(cf_var_names == "specific_humidity")
-  
-  #Temperature, pressure, and relative humidity are required to calculate specific humidity.
-  humid_data = noaa_data[[humid_index]]
-  temperature_data = noaa_data[[which(cf_var_names == "air_temperature")]]
-  pressure_data = noaa_data[[which(cf_var_names == "air_pressure")]]
-  
-  #Depending on the volume and dimensions of data you download, sometimes R stores it as a vector and sometimes
-  #as a matrix; the different cases must be processed with different loops.
-  #(The specific corner case in which a vector would be generated is if only one hour is requested; for example, 
-  #only the data at time_idx 1, for example).
-  if (as.logical(nrow(humid_data))) {
-    for (i in 1:length(humid_data)) {
-      humid_data[i] = PEcAn.data.atmosphere::rh2qair(humid_data[i], temperature_data[i], pressure_data[i])
-    }
-  } else {
-    for (i in 1:nrow(humid_data)) {
-      for (j in 1:ncol(humid_data)) {
-        humid_data[i,j] = PEcAn.data.atmosphere::rh2qair(humid_data[i,j], temperature_data[i,j], pressure_data[i,j])
-      }
-    }
-  }
-  
-  #Update the noaa_data list with the correct data
-  noaa_data[[humid_index]] <- humid_data
-  
-  # Convert NOAA's total precipitation (kg m-2) to precipitation flux (kg m-2 s-1)
-  #NOAA precipitation data is an accumulation over 6 hours.
-  precip_index = which(cf_var_names == "precipitation_flux")
-  
-  #The statement udunits2::ud.convert(1, "kg m-2 6 hr-1", "kg m-2 s-1") is equivalent to udunits2::ud.convert(1, "kg m-2 hr-1", "kg m-2 s-1") * 6,
-  #which is a little unintuitive. What will do the conversion we want is what's below:
-  noaa_data[[precip_index]] = udunits2::ud.convert(noaa_data[[precip_index]], "kg m-2 hr-1", "kg m-2 6 s-1")  #There are 21600 seconds in 6 hours
-  
-  
-  #####################################
-  #done with data processing- now want to take the list and make one df for downscaling
+   #####################################
+  #done with data processing- now want to take the list and make one df for upscaling to daily
   
   time = seq(from = start_date + lubridate::hours(6), to = end_date, by = "6 hour") 
   forecasts = matrix(ncol = length(noaa_data)+ 2, nrow = 0)
@@ -204,48 +158,37 @@ NOAA_GEFS <- function(outfolder, lat.in, lon.in, sitename, start_date = Sys.time
   }
   
   forecasts <- forecasts %>% tidyr::drop_na()
-  #forecasts$timestamp <- as.POSIXct(rep(time, 21))
-  forecasts$wind_speed <- sqrt(forecasts$eastward_wind^ 2 + forecasts$northward_wind^ 2)
   
-  ### Downscale state variables 
-  gefs_hour <- PEcAn.data.atmosphere::downscale_spline_to_hourly(df = forecasts, VarNamesStates = c("air_temperature", "wind_speed", "specific_humidity", "precipitation_flux", "air_pressure"))
+  # convert temp from K to C
+  forecasts$Temperature_height_above_ground_ens <- forecasts$Temperature_height_above_ground_ens - 273.15
   
-  ## convert longwave to hourly (just copy 6 hourly values over past 6-hour time period)
-  nonSW.flux.hrly <- forecasts %>%
-    dplyr::select(timestamp, NOAA.member, surface_downwelling_longwave_flux_in_air) %>%
-    PEcAn.data.atmosphere::downscale_repeat_6hr_to_hrly() %>% dplyr::group_by_at(c("NOAA.member", "timestamp")) %>% 
-    dplyr::summarize(surface_downwelling_longwave_flux_in_air = mean(surface_downwelling_longwave_flux_in_air))
+  # drop hours
+  forecasts$timestamp <- format(forecasts$timestamp, format = "%Y-%m-%d")
   
-  ## downscale shortwave to hourly
-  time0 = min(forecasts$timestamp)
-  time_end = max(forecasts$timestamp)
-  ShortWave.ds = PEcAn.data.atmosphere::downscale_ShortWave_to_hrly(forecasts, time0, time_end, lat = lat.in, lon = lon.in, output_tz= "UTC")%>% 
-    dplyr::group_by_at(c("NOAA.member", "timestamp")) %>% 
-    dplyr::summarize(surface_downwelling_shortwave_flux_in_air = mean(surface_downwelling_shortwave_flux_in_air))
+  day.forecast <- forecasts %>% 
+    group_by(NOAA.member) %>% 
+    group_by(timestamp, add = TRUE) %>% 
+    dplyr::summarise(max.temp = max(Temperature_height_above_ground_ens), 
+                     min.temp = min(Temperature_height_above_ground_ens),
+                     max.rh = max(Relative_humidity_height_above_ground_ens),
+                     min.rh = min(Relative_humidity_height_above_ground_ens))
   
+  day.forecast <- day.forecast %>% 
+    mutate(vpd = RHtoVPD(min.rh, min.temp))
   
-  joined<-  dplyr::inner_join(gefs_hour, nonSW.flux.hrly, by = c("NOAA.member", "timestamp"))
+  var.names <- c("max.temp", "min.temp", "max.rh", "min.rh", "vpd")
   
-  joined <- dplyr::inner_join(joined, ShortWave.ds, by = c("NOAA.member", "timestamp")) %>% 
-    dplyr::distinct() %>% 
-    dplyr::mutate(surface_downwelling_shortwave_flux_in_air = dplyr::if_else(surface_downwelling_shortwave_flux_in_air < 0, 0, surface_downwelling_shortwave_flux_in_air),
-                  specific_humidity = dplyr::if_else(specific_humidity <0, 0, specific_humidity),
-                  air_temperature = dplyr::if_else(air_temperature > 320, NA_real_, air_temperature),
-                  air_temperature = dplyr::if_else(air_temperature < 240, NA_real_, air_temperature),
-                  precipitation_flux = dplyr::if_else(precipitation_flux < 0, 0, precipitation_flux),
-                  surface_downwelling_longwave_flux_in_air = dplyr::if_else(surface_downwelling_longwave_flux_in_air < 0, NA_real_, surface_downwelling_longwave_flux_in_air),
-                  wind_speed = dplyr::if_else(wind_speed <0, 0, wind_speed)) %>%
-    dplyr::filter(is.na(timestamp) == FALSE)
+  n.days <- sum(day.forecast$NOAA.member==1)
   
-  
-  
-  
-  #############################################
-  # Done with data processing.  Now writing the data to the specified directory. Each ensemble member is written to its own file, for a total
-  # of 21 files.  
   if (!dir.exists(outfolder)) {
     dir.create(outfolder, recursive=TRUE, showWarnings = FALSE)
   }
+  
+
+  #############################################
+  # Done with data processing.  Now writing the data to the specified directory. Each ensemble member is written to its own file, for a total
+  # of 21 files.  
+  
   
   # Create a data frame with information about the file.  This data frame's format is an internal PEcAn standard, and is stored in the BETY database to
   # locate the data file.  The data file is stored on the local machine where the download occured.  Because NOAA GEFS is an 
@@ -268,37 +211,49 @@ NOAA_GEFS <- function(outfolder, lat.in, lon.in, sitename, start_date = Sys.time
   #These dimensions will be used for all 21 ncdf4 file members, so they're all declared once here.
   #The data is really one-dimensional for each file (though we include lattitude and longitude dimensions
   #to comply with the PEcAn standard).
+  
   time_dim = ncdf4::ncdim_def(name="time", 
-                              units = paste("hours since", format(start_date, "%Y-%m-%dT%H:%M")), 
-                              seq(from = 6, length.out = length(unique(joined$timestamp))), #GEFS forecast starts 6 hours from start time 
+                              units = paste("Days since", format(start_date, "%Y-%m-%dT%H:%M")), 
+                              1:n.days, 
                               create_dimvar = TRUE)
+  ens_dim = ncdf4::ncdim_def("Ens", "ens number", 1:21, create_dimvar = TRUE)
   lat_dim = ncdf4::ncdim_def("latitude", "degree_north", lat.in, create_dimvar = TRUE)
   lon_dim = ncdf4::ncdim_def("longitude", "degree_east", lon.in, create_dimvar = TRUE)
+  
+  def_list <- list()
+  for(jj in seq_along(var.names)){
+    def_list[[jj]] <- ncvar_def(name = var.names[jj],
+                                units = cf_var_units[[jj]],
+                                dim = list(time_dim, ens_dim, lat_dim, lon_dim),
+                                missval = NaN)
+  }
   
   dimensions_list = list(time_dim, lat_dim, lon_dim)
   
   nc_var_list = list()
-  for (i in 1:length(cf_var_names1)) { #Each ensemble member will have data on each variable stored in their respective file.
-    nc_var_list[[i]] = ncdf4::ncvar_def(cf_var_names1[i], cf_var_units[i], dimensions_list, missval=NaN)
+  for (i in 1:length(var.names)) { #Each ensemble member will have data on each variable stored in their respective file.
+    nc_var_list[[i]] = ncdf4::ncvar_def(var.names[i], cf_var_units[i], dimensions_list, missval=NaN)
   }
   
+  day.folder = paste("NOAA_GEFS", sitename, format(start_date, "%Y-%m-%d"), sep=".")
+  create.folder <- file.path(outfolder, day.folder)
+  
+  #Each file will go in its own folder.
+  if (!dir.exists(create.folder)) {
+    dir.create(create.folder, recursive=TRUE, showWarnings = FALSE)
+  }
+
   #For each ensemble
   for (i in 1:21) { # i is the ensemble number
     #Generating a unique identifier string that characterizes a particular data set.
-    identifier = paste("NOAA_GEFS_downscale", sitename, i, format(start_date, "%Y-%m-%dT%H:%M"), 
-                       format(end_date, "%Y-%m-%dT%H:%M"), sep=".")
+    identifier <- paste0(i, "_", day.folder, "_", format(end_date, "%Y-%m-%d"))
+    ensemble_folder = file.path(outfolder, day.folder, identifier)
     
-    ensemble_folder = file.path(outfolder, identifier)
-    data = as.data.frame(joined %>% dplyr::select(NOAA.member, cf_var_names1) %>% 
+    data = as.data.frame(day.forecast %>% dplyr::select(NOAA.member, var.names) %>% 
                            dplyr::filter(NOAA.member == i) %>% 
                            dplyr::select(-NOAA.member))
     
-    #Each file will go in its own folder.
-    if (!dir.exists(ensemble_folder)) {
-      dir.create(ensemble_folder, recursive=TRUE, showWarnings = FALSE)
-    }
-    
-    flname = file.path(ensemble_folder, paste(identifier, "nc", sep = "."))
+    flname = paste0(ensemble_folder, ".nc")
     
     #Each ensemble member gets its own unique data frame, which is stored in results_list
     #Object references in R work differently than in other languages. When adding an item to a list, R creates a copy of it
@@ -311,7 +266,7 @@ NOAA_GEFS <- function(outfolder, lat.in, lon.in, sitename, start_date = Sys.time
       nc_flptr = ncdf4::nc_create(flname, nc_var_list, verbose=verbose)
       
       #For each variable associated with that ensemble
-      for (j in 1:length(cf_var_names1)) {
+      for (j in 1:length(var.names)) {
         # "j" is the variable number.  "i" is the ensemble number. Remember that each row represents an ensemble
         ncdf4::ncvar_put(nc_flptr, nc_var_list[[j]], data[,j])
       }
@@ -324,4 +279,19 @@ NOAA_GEFS <- function(outfolder, lat.in, lon.in, sitename, start_date = Sys.time
   }
   
   return(results_list)
-  } #downscale.NOAA_GEFS
+} #downscale.NOAA_GEFS
+
+start_date = Sys.time()
+end_date = (as.POSIXct(start_date, tz=tz) + lubridate::days(16))
+
+NOAA_GEFS(outfolder, lat.in, lon.in, sitename, 
+          start_date = start_date, 
+          end_date = end_date,
+          overwrite = FALSE, verbose = FALSE)
+
+
+ncdf <- nc_open("../GEFS/Cary/NOAA_GEFS.CaryInstitute.2020-05-27/1_NOAA_GEFS.CaryInstitute.2020-05-27_2020-06-12.nc")
+data.1 <- ncvar_get(ncdf, "max.temp")
+
+
+### need to figure out max temp and precip
