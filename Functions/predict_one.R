@@ -20,12 +20,14 @@
 library(mvtnorm)
 library(boot)
 
-source("Functions/site_data_met.R")
-source("Functions/cary_tick_met_JAGS.R")
-source("Functions/ua_parts.R")
-source("Functions/obs_prob.R")
 
-predict_one <- function(type, site, met.variable, params, ic, data, A_func){
+
+predict_one <- function(type, site, met.variable, params, ic, data, A_func, dir = ""){
+  
+  source(paste0(dir, "Functions/site_data_met.R"))
+  source(paste0(dir, "Functions/cary_tick_met_JAGS.R"))
+  source(paste0(dir, "Functions/ua_parts.R"))
+  source(paste0(dir, "Functions/obs_prob.R"))
   
   # number of samples
   Nmc <- nrow(params)
