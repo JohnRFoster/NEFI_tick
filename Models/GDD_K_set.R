@@ -51,7 +51,7 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
   data$beta.prec <- 0.01
  
   # get survival estimates
-  survival <- get_survival(larva.driver = met.proc,
+  survival <- get_survival(larva.driver = NULL,
                            nymph.driver = NULL)
   data$larva.mean <- survival$larva.survival.mean
   data$larva.prec <- survival$larva.survival.prec
@@ -105,7 +105,8 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
   ### precision priors
   SIGMA ~ dwish(R, 4)         # mvn [3 x 3] site process
 
-  beta.l ~ dnorm(larva.beta.mu, larva.beta.prec)
+  beta.l ~ dnorm(0, 0.01)
+  # beta.l ~ dnorm(larva.beta.mu, larva.beta.prec)
   
   ## observation regression priors
   beta.l.obs ~ dnorm(0, 0.001) T(1E-10,)
@@ -131,9 +132,9 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
     met.obs[t] ~ dunif(met.obs.range[1], met.obs.range[2])
   }
   ## missing process met
-  for(t in met.mis){
-    met[t] ~ dunif(met.range[1], met.range[2])
-  }
+  # for(t in met.mis){
+  #   met[t] ~ dunif(met.range[1], met.range[2])
+  # }
   # for(t in met.mis.diff){
   #   met.diff[t] ~ dunif(met.range.diff[1], met.range.diff[2])
   # }
