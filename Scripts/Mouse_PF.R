@@ -5,6 +5,7 @@ library(boot)
 library(lubridate)
 library(parallel)
 library(abind)
+library(mvtnorm)
 
 source("Functions/mice_06_08.R")
 source("Functions/Future_Met.R")
@@ -16,7 +17,7 @@ source("Functions/new_mouse_observation.R")
 Forecast_id <- "05cf9022-6ea7-415f-88b7-c4f546a596a0"
 ForecastProject_id <- 20200519 # Some ID that applies to a set of forecasts
 
-grid <- "Tea Control"
+grid <- "Green Control"
 grid.short <- gsub(" Control", "", grid)
 
 dir <- file.path("../FinalOut/DA_Runs/Mouse_Hindcast", grid.short)
@@ -75,7 +76,7 @@ lambda <- matrix(NA, Nmc, nrow(met))
 for (d in 1:Nmc) {
   lambda[d,] <- inv.logit(params[d, "lambda.mean"] +
                           params[d, "beta[1]"] * met$precip +
-                          params[d, "beta[2]"] * met$temp.scale)
+                          params[d, "beta[2]"] * met$max.temp.scale)
 }
 
 
@@ -130,7 +131,7 @@ for (t in 1:(length(days)-1)) {
   precip <- met.subset %>% 
     select(precip)
   temp <- met.subset %>%
-    select(temp.scale)
+    select(max.temp.scale)
   
   n.days <- nrow(temp) # number of days in forecast
   
@@ -249,9 +250,19 @@ for (t in 1:(length(days)-1)) {
     
     new.draw <- sample.int(Nmc, Nmc, replace = TRUE, prob = norm.weights) # resample with replacement
     params <- params[new.draw,] # new parameters
+    pred.total.draw <- pred.total[new.draw] # new predicted totals
+    
+    ## Kernel smoothing (to avoid ensemble members with identical parameters)
+    X <- cbind(pred.total.draw, params) # combine states and parameters
+    Xbar <- apply(X, 2, mean)      # mean after resampling
+    SIGMA <- cov(t(t(X) / Xbar))   # covariance matrix, normalized to the mean
+    h <- 0.9
+    e <- rmvnorm(n = Nmc, mean = rep(0, ncol(X)), sigma = SIGMA)
+    Xstar = t(Xbar + h*(t(X)-Xbar) + t(e)*Xbar*(1-h))
+    
+    params <- Xstar[,-1]
     params.hist[[index]] <- params # store parameters
     
-    pred.total.draw <- pred.total[new.draw] # new predicted totals
     mice.1 <- which(obs == 1) # mice we know are alive
     
     # new initial conditions
@@ -278,7 +289,7 @@ for (t in 1:(length(days)-1)) {
     for (d in 1:Nmc) {
       lambda[d,] <- inv.logit(params[d, "lambda.mean"] +
                                 params[d, "beta[1]"] * met$precip +
-                                params[d, "beta[2]"] * met$temp.scale)
+                                params[d, "beta[2]"] * met$max.temp.scale)
     }
   }
   
