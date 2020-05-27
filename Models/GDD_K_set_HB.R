@@ -31,6 +31,8 @@ run_model <- function(met.proc, n.adapt, n.chains){
   data <- hb_restructure(data)
   data$R <- diag(1, 3, 3)
   
+  data$obs.temp.range <- range(data$temp.min, na.rm = TRUE)
+  
   # get survival estimates
   survival <- get_survival(larva.driver = met.proc,
                            nymph.driver = met.proc)
@@ -49,13 +51,12 @@ run_model <- function(met.proc, n.adapt, n.chains){
                            phi.a.mu = rnorm(1, init.params["phi.a.mu"], 0.01),
                            grow.ln.mu = rnorm(1, init.params["grow.ln.mu"], 0.1),
                            grow.na.mu = rnorm(1, init.params["grow.na.mu"], 0.1),
-                           theta.larva = runif(1, init.params["theta.larva"]*0.9, 0.9999),
                            theta.nymph = runif(1, init.params["theta.nymph"]*0.9, 0.9999),
                            theta.adult = runif(1, init.params["theta.adult"]*0.9, 0.9999),
                            alpha.a = rnorm(3, 0, 1))}
   
-  data$temp.min <- data$temp.max <- data$rh.max <- data$rh.min <- data$precip <- data$vpd <- NULL
-  data$mis.rh.max <- data$mis.rh.min <- data$mis.temp.max <- data$mis.temp.min <- data$mis.vpd <- NULL
+  data$temp.max <- data$rh.max <- data$rh.min <- data$precip <- data$vpd <- NULL
+  data$mis.rh.max <- data$mis.rh.min <- data$mis.temp.max <- data$mis.vpd <- NULL
   
   monitor <- c("x",
                "deviance",
@@ -66,10 +67,10 @@ run_model <- function(met.proc, n.adapt, n.chains){
                "grow.na.mu",
                "repro.mu",
                "SIGMA",
-               "theta.larva",
+               # "theta.larva",
                "theta.nymph",
                "theta.adult",
-               # "beta.l.obs",
+               "beta.l.obs",
                # "beta.l.lat",
                # "beta.l.vert")
                # "beta.n.obs",
@@ -105,7 +106,7 @@ run_model <- function(met.proc, n.adapt, n.chains){
   }
   
   ## observation regression priors
-  # beta.l.obs ~ dnorm(0, 0.001) T(1E-10,)
+  beta.l.obs ~ dnorm(0, 0.001) T(1E-10,)
   # beta.n.obs ~ dnorm(0, 0.001) T(1E-10,)
   # beta.a.obs ~ dnorm(0, 0.001) T(1E-10,)
   # beta.l.vert ~ dnorm(0, 0.001) T(0,)
@@ -114,9 +115,14 @@ run_model <- function(met.proc, n.adapt, n.chains){
   # beta.l.lat ~ dnorm(0, 0.001)
   # beta.n.lat ~ dnorm(0, 0.001)
   # beta.a.lat ~ dnorm(0, 0.001)
-  theta.larva ~ dunif(0,1)
+  # theta.larva ~ dunif(0,1)
   theta.nymph ~ dunif(0,1)
   theta.adult ~ dunif(0,1)
+
+  ## missing min temp (observation temp)
+  for(m in mis.temp.min){
+    temp.min[m] ~ dunif(obs.temp.range[1], obs.temp.range[2])
+  }
   
   ### first latent process 
   for(s in 1:3){
@@ -200,12 +206,12 @@ run_model <- function(met.proc, n.adapt, n.chains){
       m[3,t,s] <- x[3,t,s]*b.adult[t,s] + 1E-10
       
       ## observation probability based on temperature
-      # theta.larva[t] <- 1 / (1 + beta.l.obs*(met.obs[t])^2)
+      theta.larva[t,s] <- 1 / (1 + beta.l.obs*(temp.min[t])^2)
       # theta.nymph[t] <- 1 / (1 + beta.n.obs*(met.obs[t])^2)
       # theta.adult[t] <- 1 / (1 + beta.a.vert + beta.a.obs*(met.obs[t])^2)
       
       ## binary outcome of observation by life stage
-      b.larva[t,s] ~ dbern(theta.larva)
+      b.larva[t,s] ~ dbern(theta.larva[t,s])
       b.nymph[t,s] ~ dbern(theta.nymph)
       b.adult[t,s] ~ dbern(theta.adult)
       
