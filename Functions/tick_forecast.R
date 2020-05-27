@@ -7,7 +7,8 @@ tick_forecast <- function(params, ic, gdd, met.data, obs.temp, n.days){
   Nmc <- nrow(params)
   
   # storage
-  pred <- array(dim = c(3,n.days,Nmc))
+  pred <- array(dim = c(3,n.days+1,Nmc))
+  pred[,1,] <- t(ic)
   
   # partition samples
   ua <- ua_parts(params, ic, c("process", "parameter"))
@@ -74,17 +75,17 @@ tick_forecast <- function(params, ic, gdd, met.data, obs.temp, n.days){
       Ex <- TRANS %*% obs
       est.mvnorm <- rmvnorm(1,Ex,ua$SIGMA[,,m])
       
-      b.larva <- rbinom(1, 1, obs.prob$theta.larva[m,t])
-      b.nymph <- rbinom(1, 1, obs.prob$theta.nymph[m,t])
-      b.adult <- rbinom(1, 1, obs.prob$theta.adult[m,t])
+      b.larva <- rbinom(1, 1, min(1, obs.prob$theta.larva[m,t]))
+      b.nymph <- rbinom(1, 1, min(1, obs.prob$theta.nymph[m,t]))
+      b.adult <- rbinom(1, 1, min(1, obs.prob$theta.adult[m,t]))
       
       # Observation model
-      pred[1,t,m] <- max(est.mvnorm[1], 0)*b.larva + 1E-10 
-      pred[2,t,m] <- max(est.mvnorm[2], 0)*b.nymph + 1E-10 
-      pred[3,t,m] <- max(est.mvnorm[3], 0)*b.adult + 1E-10 
-      
+      pred[1,t+1,m] <- max(est.mvnorm[1], 0)*b.larva #+ 1e-10 
+      pred[2,t+1,m] <- max(est.mvnorm[2], 0)*b.nymph #+ 1e-10
+      pred[3,t+1,m] <- max(est.mvnorm[3], 0)*b.adult #+ 1e-10
     }
   }
+  pred <- round(pred) # ticks are discrete
   return(pred)
 }
 
