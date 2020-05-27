@@ -1,3 +1,4 @@
+library(popbio)
 sensitivity_elasticity <- function(A, data){
   
   Nmc <- dim(A)[4]
@@ -35,7 +36,7 @@ sensitivity_elasticity <- function(A, data){
   # storage for sensitivity and elasticity matrices
   S.Bh <- E.Bh <- array(0, dim = dim(D))
   for(m in 1:Nmc){
-    for(t in 1:72){
+    for(t in 1:N_est){
       
       # A.h is the product of all phase matrices within time frame
       A.h <- D[,,t,m] %*% Bh[,,t,m]
