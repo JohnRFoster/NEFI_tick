@@ -1,0 +1,11 @@
+#! /bin/bash -l
+#$ -j y
+#$ -m ea
+#$ -l buyin
+#$ -l mem_per_core=8G
+#$ -l h_rt=4:00:00
+#$ -N NOAA_GEFS
+#$ -o ../Output_Files/NOAA/
+# module load netcdf
+module load R
+Rscript /projectnb/dietzelab/fosterj/NEFI_tick/Scripts/NOAA_GEFS_site_download.R
