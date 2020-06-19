@@ -22,18 +22,35 @@ hb_restructure <- function(data, met.proc){
   }    
   data$seq.days <- seq.days  
   
-  data$temp.min <- c(data$temp.min[1,1], data$temp.min[,2])
-  data$temp.max <- c(data$temp.max[1,1], data$temp.max[,2])
-  data$rh.min <- c(data$rh.min[1,1], data$rh.min[,2])
-  data$rh.max <- c(data$rh.max[1,1], data$rh.max[,2])
-  data$precip <- c(data$precip[1,1], data$precip[,2])
-  data$vpd <- c(data$vpd[1,1], data$vpd[,2])
+  if(!is.null(met.proc)){
+    if(met.proc == "vpd"){
+      data$met <- data$vpd <- c(data$vpd[1,1], data$vpd[,2])
+      data$met.mis <- which(is.na(data$met))
+    } else if (met.proc == "min temp"){
+      data$met <- c(data$temp.min[1,1], data$temp.min[,2])
+      data$met.mis <- which(is.na(data$met))
+    } else if (met.proc == "max temp"){
+      data$met <- c(data$temp.max[1,1], data$temp.max[,2])
+      data$met.mis <- which(is.na(data$met))
+    } else if (met.proc == "min rh"){
+      data$met <- c(data$rh.min[1,1], data$rh.min[,2])
+      data$met.mis <- which(is.na(data$met))
+    } else if (met.proc == "max rh"){
+      data$met <- c(data$rh.max[1,1], data$rh.max[,2])
+      data$met.mis <- which(is.na(data$met))
+    } else if (met.proc == "preicp"){
+      data$met <- c(data$precip[1,1], data$precip[,2])
+      data$met.mis <- which(is.na(data$met))
+    }  
+  }
   
-  data$mis.rh.max <- which(is.na(data$rh.max))
-  data$mis.rh.min <- which(is.na(data$rh.min))
-  data$mis.temp.max <- which(is.na(data$temp.max))
+  data$temp.min <- c(data$temp.min[1,1], data$temp.min[,2])
   data$mis.temp.min <- which(is.na(data$temp.min))
-  data$mis.vpd <- which(is.na(data$vpd))
+  data$temp.min.range <- range(data$temp.min, na.rm = TRUE)
+  data$met.mis.range <- range(data$met, na.rm = TRUE)
+  
+  data$temp.max <- data$rh.max <- data$rh.min <- data$precip <- data$vpd <- NULL
+  data$mis.rh.max <- data$mis.rh.min <- data$mis.temp.max <- data$mis.vpd <- NULL
   
   return(data)
 }
