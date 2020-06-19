@@ -35,6 +35,7 @@ sensitivity_elasticity <- function(A, data){
   
   # storage for sensitivity and elasticity matrices
   S.Bh <- E.Bh <- array(0, dim = dim(D))
+  m.index <- rep(TRUE, Nmc)
   for(m in 1:Nmc){
     for(t in 1:N_est){
       
@@ -43,6 +44,7 @@ sensitivity_elasticity <- function(A, data){
       
       # sensitivity of A.h
       S.Ah <- sensitivity(A.h)
+      if(all(is.na(S.Ah))) m.index[m] <- FALSE
       
       # sensitivity of Bh
       S.Bh[,,t,m] <- t(D[,,t,m]) %*% S.Ah
@@ -52,7 +54,7 @@ sensitivity_elasticity <- function(A, data){
     }  
   }
   
-  return(list(sensitivity = S.Bh,
-              elasticity = E.Bh))
+  return(list(sensitivity = S.Bh[,,,which(m.index)],
+              elasticity = E.Bh[,,,which(m.index)]))
   
 }
