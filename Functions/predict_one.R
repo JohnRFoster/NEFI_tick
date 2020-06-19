@@ -14,7 +14,8 @@
 #' @param params matrix of JAGS output of parameters
 #' @param ic matrix of JAGS output of states
 #' @param data model data fed to JAGS
-#' @param A_func function that specifies how to build A matrices
+#' @param A_func function that specifies how to build A matrices, default = NULL
+#' @param A A matrix, default = NULL. Must specify either A_func OR A
 #' @export
 
 library(mvtnorm)
@@ -22,7 +23,8 @@ library(boot)
 
 
 
-predict_one <- function(type, site, met.variable, params, ic, data, A_func, dir = ""){
+predict_one <- function(type, site, met.variable, params, ic, data, 
+                        A_func = NULL, A = NULL, dir = "", HB = FALSE){
   
   source(paste0(dir, "Functions/site_data_met.R"))
   source(paste0(dir, "Functions/cary_tick_met_JAGS.R"))
@@ -55,7 +57,12 @@ predict_one <- function(type, site, met.variable, params, ic, data, A_func, dir 
   
   # partition samples
   ua <- ua_parts(params, ic, type)
-  A <- A_func(ua, data)
+  
+  # get A
+  if(is.null(A)){
+    A <- A_func(ua, data)  
+  }
+  
   obs.prob <- obs_prob(ua, N_est, obs.temp)
   
   # run mcmc sampling
@@ -73,9 +80,16 @@ predict_one <- function(type, site, met.variable, params, ic, data, A_func, dir 
       }
  
       ## initial condition
-      l <- ua$IC[m, paste("x[1,",t,"]",sep="")]
-      n <- ua$IC[m, paste("x[2,",t,"]",sep="")]
-      a <- ua$IC[m, paste("x[3,",t,"]",sep="")]
+      if(is.numeric(HB)){
+        end <- paste0(",", HB, "]")
+        l <- ua$IC[m, paste0("x[1,",t,end)]
+        n <- ua$IC[m, paste0("x[2,",t,end)]
+        a <- ua$IC[m, paste0("x[3,",t,end)]  
+      } else {
+        l <- ua$IC[m, paste0("x[1,",t,"]")]
+        n <- ua$IC[m, paste0("x[2,",t,"]")]
+        a <- ua$IC[m, paste0("x[3,",t,"]")]  
+      }
       
       TRANS <- A.agg[,,day]
       
