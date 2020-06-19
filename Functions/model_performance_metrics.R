@@ -30,3 +30,12 @@ bayes_p_val <- function(pred, obs){
   }
   return(bayes.p.val)
 }
+
+
+# mean squared prediction error
+mspe <- function(pred, obs){
+  n <- length(obs)
+  diff.sq <- (obs - pred)^2
+  mspe <- sum(diff.sq) / n
+  return(mspe)
+}
