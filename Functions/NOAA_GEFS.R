@@ -1,21 +1,14 @@
-library(rnoaa)
-library(plantecophys)
 
-lat.in <- 41.7851 
-lon.in <- -73.7338
-sitename <- "CaryInstitute"
-outfolder <- "../GEFS/Cary"
-tz="America/New_York"
-
-# will need to download all time forcasts (every six hours)
-# so that I can grab max and min
-
-# will need to convert rh and tempt to vpd
 
 NOAA_GEFS <- function(outfolder, lat.in, lon.in, sitename, 
-                      start_date = Sys.time(), 
-                      end_date = (as.POSIXct(start_date, tz=tz) + lubridate::days(16)),
+                      tz = NULL,
+                      start_date = Sys.time(),
+                      end_date = NULL,
                       overwrite = FALSE, verbose = FALSE, ...) {
+  
+  # if timezone and end_date not specified
+  if(is.null(tz)) tz <- "UTC"
+  if(is.null(end_date)) end_date <- (as.POSIXct(start_date, tz=tz) + lubridate::days(16))
   
   start_date <- as.POSIXct(start_date, tz = tz)
   end_date <- as.POSIXct(end_date, tz = tz)
@@ -95,25 +88,18 @@ NOAA_GEFS <- function(outfolder, lat.in, lon.in, sitename,
   
   # We want data for each of the following variables. 
   noaa_var_names = c("Temperature_height_above_ground_ens",
-                     "Relative_humidity_height_above_ground_ens", 
+                     # "foobar",
+                     "Relative_humidity_height_above_ground_ens",
                      "Total_precipitation_surface_6_Hour_Accumulation_ens")
   
   cf_var_names = noaa_var_names
-  cf_var_units = c("C", "C", "percent", "precent", "kPa")  #Negative numbers indicate negative exponents
-  
-  # This debugging loop allows you to check if the cf variables are correctly mapped to the equivalent
-  # NOAA variable names.  This is very important, as much of the processing below will be erroneous if 
-  # these fail to match up.
-  for (i in 1:length(cf_var_names)) {
-   print(sprintf("cf / noaa   :   %s / %s", cf_var_names[[i]], noaa_var_names[[i]]))
-  }
-  
-  noaa_data = list()
   
   #Downloading the data here.  It is stored in a matrix, where columns represent time in intervals of 6 hours, and rows represent
   #each ensemble member.  Each variable getxs its own matrix, which is stored in the list noaa_data.
   
+  noaa_data <- list()
   for (i in 1:length(noaa_var_names)) {
+    print(noaa_var_names[i])
     noaa_data[[i]] = rnoaa::gefs(noaa_var_names[i], 
                                  lat.in, lon.in, 
                                  raw=TRUE, 
@@ -171,12 +157,14 @@ NOAA_GEFS <- function(outfolder, lat.in, lon.in, sitename,
     dplyr::summarise(max.temp = max(Temperature_height_above_ground_ens), 
                      min.temp = min(Temperature_height_above_ground_ens),
                      max.rh = max(Relative_humidity_height_above_ground_ens),
-                     min.rh = min(Relative_humidity_height_above_ground_ens))
+                     min.rh = min(Relative_humidity_height_above_ground_ens),
+                     precip = sum(Total_precipitation_surface_6_Hour_Accumulation_ens))
   
   day.forecast <- day.forecast %>% 
     mutate(vpd = RHtoVPD(min.rh, min.temp))
   
-  var.names <- c("max.temp", "min.temp", "max.rh", "min.rh", "vpd")
+  var.names <- c("max.temp", "min.temp", "max.rh", "min.rh", "precip", "vpd")
+  cf_var_units = c("C", "C", "percent", "precent", "mm", "kPa")  
   
   n.days <- sum(day.forecast$NOAA.member==1)
   
@@ -216,7 +204,7 @@ NOAA_GEFS <- function(outfolder, lat.in, lon.in, sitename,
                               units = paste("Days since", format(start_date, "%Y-%m-%dT%H:%M")), 
                               1:n.days, 
                               create_dimvar = TRUE)
-  ens_dim = ncdf4::ncdim_def("Ens", "ens number", 1:21, create_dimvar = TRUE)
+  # ens_dim = ncdf4::ncdim_def("Ens", "ens number", 1:21, create_dimvar = TRUE)
   lat_dim = ncdf4::ncdim_def("latitude", "degree_north", lat.in, create_dimvar = TRUE)
   lon_dim = ncdf4::ncdim_def("longitude", "degree_east", lon.in, create_dimvar = TRUE)
   
@@ -224,7 +212,7 @@ NOAA_GEFS <- function(outfolder, lat.in, lon.in, sitename,
   for(jj in seq_along(var.names)){
     def_list[[jj]] <- ncvar_def(name = var.names[jj],
                                 units = cf_var_units[[jj]],
-                                dim = list(time_dim, ens_dim, lat_dim, lon_dim),
+                                dim = list(time_dim, lat_dim, lon_dim),
                                 missval = NaN)
   }
   
@@ -249,9 +237,10 @@ NOAA_GEFS <- function(outfolder, lat.in, lon.in, sitename,
     identifier <- paste0(i, "_", day.folder, "_", format(end_date, "%Y-%m-%d"))
     ensemble_folder = file.path(outfolder, day.folder, identifier)
     
-    data = as.data.frame(day.forecast %>% dplyr::select(NOAA.member, var.names) %>% 
-                           dplyr::filter(NOAA.member == i) %>% 
-                           dplyr::select(-NOAA.member))
+    data <- as.data.frame(day.forecast %>% 
+                           dplyr::select(NOAA.member, var.names) %>% 
+                           dplyr::filter(NOAA.member == i))
+    data <- data %>% dplyr::select(var.names)  
     
     flname = paste0(ensemble_folder, ".nc")
     
@@ -267,7 +256,8 @@ NOAA_GEFS <- function(outfolder, lat.in, lon.in, sitename,
       
       #For each variable associated with that ensemble
       for (j in 1:length(var.names)) {
-        # "j" is the variable number.  "i" is the ensemble number. Remember that each row represents an ensemble
+        # "j" is the variable number.  "i" is the ensemble number. 
+        # Remember that each row represents an ensemble
         ncdf4::ncvar_put(nc_flptr, nc_var_list[[j]], data[,j])
       }
       
@@ -277,21 +267,9 @@ NOAA_GEFS <- function(outfolder, lat.in, lon.in, sitename,
     }
     
   }
-  
+  file <- paste0(create.folder, "/ResultsListMeta", format(start_date, "%Y-%m-%d"), ".RData")
+  save(results_list,
+       file = file)
   return(results_list)
 } #downscale.NOAA_GEFS
 
-start_date = Sys.time()
-end_date = (as.POSIXct(start_date, tz=tz) + lubridate::days(16))
-
-NOAA_GEFS(outfolder, lat.in, lon.in, sitename, 
-          start_date = start_date, 
-          end_date = end_date,
-          overwrite = FALSE, verbose = FALSE)
-
-
-ncdf <- nc_open("../GEFS/Cary/NOAA_GEFS.CaryInstitute.2020-05-27/1_NOAA_GEFS.CaryInstitute.2020-05-27_2020-06-12.nc")
-data.1 <- ncvar_get(ncdf, "max.temp")
-
-
-### need to figure out max temp and precip
