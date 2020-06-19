@@ -1,4 +1,4 @@
-get_inits_HB <- function(met.proc){
+get_inits_HB <- function(init.dir = NULL, init.model.name = NULL, met.proc = NULL){
 
 
   ## reduce data to just what is needed, grab inits
@@ -13,47 +13,24 @@ get_inits_HB <- function(met.proc){
     load(file.path(init.dir, "Tea/Combined_thinMat_NULL_TeaControl.RData"))
     init.params <- rbind(init.params, params.mat)
     
-  } else if(met.proc == "max temp"){
+    init.params <- apply(init.params, 2, mean)
+    return(init.params)
     
-    # init.dir <- "../FinalOut/Independent_Fits/GDDThreshold/Temp_ObsProc/Obs_1_beta"
-    # load(file.path(init.dir, "Green/Combined_thinMat_MaxTemp_ObsProc_beta_1_K_set_GreenControl.RData"))
-    # init.params <- params.mat
-    # 
-    # load(file.path(init.dir, "Henry/Combined_thinMat_MaxTemp_ObsProc_beta_1_K_set_HenryControl.RData"))
-    # init.params <- rbind(init.params, params.mat)
-    # 
-    # load(file.path(init.dir, "Tea/Combined_thinMat_MaxTemp_ObsProc_beta_1_K_set_TeaControl.RData"))
-    # init.params <- rbind(init.params, params.mat)
+  } 
+  
+  if(!is.null(init.dir) & !is.null(init.model.name)){
+    load(paste0(init.dir, "Green/", init.model.name, "_GreenControl.RData"))
+    init.params <- params.mat
     
-  } else if(met.proc == "max rh" | met.proc == "min rh"){
+    load(paste0(init.dir, "Henry/", init.model.name, "_HenryControl.RData"))
+    init.params <- rbind(init.params, params.mat)
     
-    # init.dir <- "../FinalOut/Independent_Fits/GDDThreshold/RH_ObsProc/beta_111"
-    # load(file.path(init.dir, "Green/Combined_thinMat_MaxRH_ObsProc_beta_111_K_set_GreenControl.RData"))
-    # init.params <- params.mat
-    # 
-    # load(file.path(init.dir, "Henry/Combined_thinMat_MaxRH_ObsProc_beta_111_K_set_HenryControl.RData"))
-    # init.params <- rbind(init.params, params.mat)
-    # 
-    # load(file.path(init.dir, "Tea/Combined_thinMat_MaxRH_ObsProc_beta_111_K_set_TeaControl.RData"))
-    # init.params <- rbind(init.params, params.mat)
+    load(paste0(init.dir, "Tea/", init.model.name, "_TeaControl.RData"))
+    init.params <- rbind(init.params, params.mat)
     
-  } else if(met.proc == "vpd"){
-    
-    # init.dir <- "../FinalOut/Independent_Fits/GDDThreshold/VPD_ObsProc/beta_111"
-    # load(file.path(init.dir, "Green/Combined_thinMat_VPD_ObsProc_beta_1_K_set_GreenControl.RData"))
-    # init.params <- params.mat
-    # 
-    # load(file.path(init.dir, "Henry/Combined_thinMat_VPD_ObsProc_beta_1_K_set_HenryControl.RData"))
-    # init.params <- rbind(init.params, params.mat)
-    # 
-    # load(file.path(init.dir, "Tea/Combined_thinMat_VPD_ObsProc_beta_1_K_set_TeaControl.RData"))
-    # init.params <- rbind(init.params, params.mat)
-    
-  } else {
-    stop("met.proc not set!!", call. = FALSE)
+    init.params <- apply(init.params, 2, mean)
+    return(init.params)
   }
   
-  init.params <- apply(init.params, 2, mean)
   
-  return(init.params)
 }
