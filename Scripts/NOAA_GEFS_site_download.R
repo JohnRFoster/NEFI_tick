@@ -1,11 +1,11 @@
 library(ncdf4)
-library(lubridate)
 library(rnoaa)
+library(lubridate)
 library(plantecophys)
 library(tidyr)
 library(dplyr)
-# library(PEcAn.logger)
-# library(PEcAn.remote)
+library(PEcAn.logger)
+library(PEcAn.remote)
 
 setwd("/projectnb/dietzelab/fosterj/NEFI_tick")
 source("Functions/NOAA_GEFS.R")
@@ -29,7 +29,7 @@ results <- NOAA_GEFS(
   lat.in,
   lon.in,
   sitename,
-  tz = tz,
+  tz = NULL,
   start_date = start_date,
   end_date = end_date,
   overwrite = FALSE,
@@ -38,7 +38,7 @@ results <- NOAA_GEFS(
 
 save(results, 
      file = paste0(outfolder, "/results.RData"))
-cat("----- Cary Institute downloaded -----\n")
+cat("===== Cary Institute downloaded =====\n")
 
 #------------------------
 #    Harvard Forest 
@@ -55,13 +55,13 @@ results <- NOAA_GEFS(
   lat.in,
   lon.in,
   sitename,
-  tz = tz,
+  tz = NULL,
   start_date = start_date,
   end_date = end_date,
   overwrite = FALSE,
   verbose = FALSE
 )
-cat("----- Harvard Forest downloaded -----\n")
+cat("===== Harvard Forest downloaded =====\n")
 
 
 
