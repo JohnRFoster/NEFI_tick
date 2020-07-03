@@ -36,6 +36,22 @@ build_periodic_matrices_null <- function(ua, data, hb.site = NULL){
       alpha.l <- rep(0, Nmc)
     }
   }
+  
+  if("rho.l" %in% names(ua)){
+    rho.l <- ua$rho.l
+  } else {
+    rho.l <- rep(1500, Nmc)
+  }
+  if("rho.n" %in% names(ua)){
+    rho.n <- ua$rho.n
+  } else {
+    rho.n <- rep(500, Nmc)
+  }
+  if("rho.a" %in% names(ua)){
+    rho.a <- ua$rho.a
+  } else {
+    rho.a <- rep(2500, Nmc)
+  }
     
   # storage
   A <- array(0, dim=c(3,3,N_days,Nmc))
@@ -45,9 +61,9 @@ build_periodic_matrices_null <- function(ua, data, hb.site = NULL){
     
     phi.11 <- inv.logit(ua$phi.l.mu[m])
     phi.22 <- inv.logit(ua$phi.n.mu[m])
-    lambda <- ifelse(gdd >= 1500 & gdd <= 2500, ua$repro.mu[m], 0)
-    theta.32 <- ifelse(gdd <= 1000 | gdd >= 2500, inv.logit(ua$grow.na.mu[m]), 0)
-    theta.21 <- ifelse(gdd >= 500 & gdd <= 2500, inv.logit(ua$grow.ln.mu[m]), 0)  
+    lambda <- ifelse(gdd >= rho.l[m] & gdd <= 2500, ua$repro.mu[m], 0)
+    theta.32 <- ifelse(gdd <= 1000 | gdd >= rho.a[m], inv.logit(ua$grow.na.mu[m]), 0)
+    theta.21 <- ifelse(gdd >= rho.n[m] & gdd <= 2500, inv.logit(ua$grow.ln.mu[m]), 0)  
     
     # draw transition matrix with
     
