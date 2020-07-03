@@ -39,3 +39,15 @@ mspe <- function(pred, obs){
   mspe <- sum(diff.sq) / n
   return(mspe)
 }
+
+# percent bias
+percent_bias <- function(pred, obs){
+  pb <- 100 * (sum(pred - obs) / sum(obs))
+  return(pb)
+}
+
+# bias
+bias <- function(pred, obs){
+  bias <- mean(pred) - mean(obs)
+  return(bias)
+}
