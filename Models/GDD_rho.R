@@ -45,13 +45,13 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
   }
   data$seq.days <- seq.days
   
-  data$R <- diag(1, 3, 3)
+  # data$R <- diag(1, 3, 3)
   
   # which transitions are set and which are variable
-  # data$rho.n.mu <- 500
-  # data$rho.l.mu <- 1500
+  data$rho.n.mu <- 500
+  data$rho.l.mu <- 1500
   data$rho.a.mu <- 2500
-  data$rho.prec <- 1 / 100^2
+  data$rho.prec <- 1 / 200^2
   
   # get survival estimates
   survival <- get_survival(larva.driver = NULL,
@@ -69,6 +69,8 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
       phi.n.mu = rnorm(1, data$nymph.mean, 0.1),
       phi.a.mu = rnorm(1, 6, 0.001),
       rho.a = runif(1, 2400, 2600),
+      rho.l = runif(1, 1400, 1600),
+      rho.n = runif(1, 400, 600),
       grow.ln.mu = rnorm(1, -6, 0.1),
       grow.na.mu = rnorm(1, -6, 0.1)
     )
@@ -84,10 +86,15 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
     "grow.ln.mu",
     "grow.na.mu",
     "repro.mu",
-    "SIGMA",
+    # "SIGMA",
     "theta.nymph",
     "theta.adult",
     "beta.l.obs",
+    "tau_l",
+    "tau_n",
+    "tau_a",
+    "rho.l",
+    "rho.n",
     "rho.a"
   )
 
@@ -100,10 +107,15 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
   grow.ln.mu ~ dnorm(-6, 1)             # larvae -> nymph transition
   grow.na.mu ~ dnorm(-6, 1)             # nymph -> adult transition
   repro.mu ~ dnorm(7, 0.01) T(0,)              # adult -> larvae transition (reproduction)
-  rho.a ~ dnorm(rho.a.mu, rho.prec) T(0,) # transition threshold
+  rho.l ~ dnorm(rho.l.mu, rho.prec) T(0,)
+  rho.n ~ dnorm(rho.n.mu, rho.prec) T(0,)
+  rho.a ~ dnorm(rho.a.mu, rho.prec) T(0,)
 
   ### precision priors
-  SIGMA ~ dwish(R, 4)         # mvn [3 x 3] site process
+  # SIGMA ~ dwish(R, 4)         # mvn [3 x 3] site process
+  tau_l ~ dgamma(0.001, 0.001)
+  tau_n ~ dgamma(0.001, 0.001)
+  tau_a ~ dgamma(0.001, 0.001)
   
   ## observation regression priors
   beta.l.obs ~ dnorm(0, 0.001) T(1E-10,)
@@ -139,9 +151,9 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
   ## Survival parameters are random intercept plus fixed effect on temperature
   ## transition is a threshold (on if within gdd window, off otherwise)
   
-  theta.21[t] <- ifelse((gdd[t] >= 500) && (gdd[t] <= 2500),l2n,0)
+  theta.21[t] <- ifelse((gdd[t] >= rho.n) && (gdd[t] <= 2500),l2n,0)
   theta.32[t] <- ifelse((gdd[t] <= 1000) || (gdd[t] >= rho.a),n2a,0)
-  lambda[t] <- ifelse((gdd[t] >= 1500) && (gdd[t] <= 2500),repro.mu,0)
+  lambda[t] <- ifelse((gdd[t] >= rho.l) && (gdd[t] <= 2500),repro.mu,0)
   
   A.day[1,1,t] <- phi.11*(1-theta.21[t])
   A.day[2,1,t] <- phi.11*theta.21[t]
@@ -176,7 +188,10 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
   Ex[1:3,t] <- TRANS[1:3,1:3,dt.index[t]] %*% x[1:3,t]
   
   # process error
-  p[1:3,t] ~ dmnorm(Ex[1:3,t], SIGMA)
+  # p[1:3,t] ~ dmnorm(Ex[1:3,t], SIGMA)
+  p[1,t] ~ dnorm(Ex[1,t], tau_l)
+  p[2,t] ~ dnorm(Ex[2,t], tau_n)
+  p[3,t] ~ dnorm(Ex[3,t], tau_a)
   x[1,t+1] <- max(p[1,t], 0)
   x[2,t+1] <- max(p[2,t], 0)
   x[3,t+1] <- max(p[3,t], 0)
@@ -197,8 +212,6 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
   
   ## observation probability based on temperature
   theta.larva[t] <- 1 / (1 + beta.l.obs*(met.obs[t])^2)
-  # theta.nymph[t] <- 1 / (1 + beta.n.obs*(met.obs[t])^2)
-  # theta.adult[t] <- 1 / (1 + beta.a.vert + beta.a.obs*(met.obs[t])^2)
   
   ## binary outcome of observation by life stage
   b.larva[t] ~ dbern(theta.larva[t])
