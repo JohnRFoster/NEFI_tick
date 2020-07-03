@@ -1,17 +1,12 @@
 
 
 NOAA_GEFS <- function(outfolder, lat.in, lon.in, sitename, 
-                      tz = NULL,
-                      start_date = Sys.time(),
-                      end_date = NULL,
+                      start_date = Sys.time(), 
+                      end_date = (as.POSIXct(start_date, tz="UTC") + lubridate::days(16)),
                       overwrite = FALSE, verbose = FALSE, ...) {
   
-  # if timezone and end_date not specified
-  if(is.null(tz)) tz <- "UTC"
-  if(is.null(end_date)) end_date <- (as.POSIXct(start_date, tz=tz) + lubridate::days(16))
-  
-  start_date <- as.POSIXct(start_date, tz = tz)
-  end_date <- as.POSIXct(end_date, tz = tz)
+  start_date <- as.POSIXct(start_date, tz = "UTC")
+  end_date <- as.POSIXct(end_date, tz = "UTC")
   
   #It takes about 2 hours for NOAA GEFS weather data to be posted.  Therefore, if a request is made within that 2 hour window,
   #we instead want to adjust the start time to the previous forecast, which is the most recent one avaliable.  (For example, if
@@ -35,38 +30,29 @@ NOAA_GEFS <- function(outfolder, lat.in, lon.in, sitename,
     PEcAn.logger::logger.info(paste0("Updated end date is ", end_date))
   }
   
-  # Round the starting date/time down to the previous block of 6 hours.  
-  # Adjust the time frame to match.
+  #Round the starting date/time down to the previous block of 6 hours.  Adjust the time frame to match.
+  forecast_hour = (lubridate::hour(start_date) %/% 6) * 6 #Integer division by 6 followed by re-multiplication acts like a "floor function" for multiples of 6
+  increments = as.integer(as.numeric(end_date - start_date, units = "hours") / 6) #Calculating the number of forecasts between start and end dates.
+  increments = increments + ((lubridate::hour(end_date) - lubridate::hour(start_date)) %/% 6) #These calculations are required to use the rnoaa package.
   
-  # Integer division by 6 followed by re-multiplication acts like a "floor function" for multiples of 6
-  forecast_hour = (lubridate::hour(start_date) %/% 6) * 6 
+  end_hour = sprintf("%04d", ((forecast_hour + (increments * 6)) %% 24) * 100)  #Calculating the starting hour as a string, which is required type to access the 
+  #data via the rnoaa package
+  forecast_hour = sprintf("%04d", forecast_hour * 100)  #Having the end date as a string is useful later, too.
   
-  # Calculating the number of forecasts between start and end dates.
-  increments = as.integer(as.numeric(end_date - start_date, units = "hours") / 6) 
-  
-  # These calculations are required to use the rnoaa package.
-  increments = increments + ((lubridate::hour(end_date) - lubridate::hour(start_date)) %/% 6) 
-  
-  # Calculating the starting hour as a string, which is required type to access the data via the rnoaa package 
-  end_hour = sprintf("%04d", ((forecast_hour + (increments * 6)) %% 24) * 100)  
-  
-  # Having the end date as a string is useful later, too.
-  forecast_hour = sprintf("%04d", forecast_hour * 100)  
-  
-  # Recreate the adjusted start and end dates.
+  #Recreate the adjusted start and end dates.
   start_date = as.POSIXct(paste0(lubridate::year(start_date), "-", lubridate::month(start_date), "-", lubridate::day(start_date), " ", 
-                                 substring(forecast_hour, 1,2), ":00:00"), tz=tz)
+                                 substring(forecast_hour, 1,2), ":00:00"), tz="UTC")
   
   end_date = start_date + lubridate::hours(increments * 6)
   
   
-  # Bounds date checking
-  # NOAA's GEFS database maintains a rolling 12 days of forecast data for access through this function.
-  # We do want Sys.Date() here - NOAA makes data unavaliable days at a time, not forecasts at a time.
-  NOAA_GEFS_Start_Date = as.POSIXct(Sys.Date(), tz=tz) - lubridate::days(11)  #Subtracting 11 days is correct, not 12.
+  #Bounds date checking
+  #NOAA's GEFS database maintains a rolling 12 days of forecast data for access through this function.
+  #We do want Sys.Date() here - NOAA makes data unavaliable days at a time, not forecasts at a time.
+  NOAA_GEFS_Start_Date = as.POSIXct(Sys.Date(), tz="UTC") - lubridate::days(11)  #Subtracting 11 days is correct, not 12.
   
-  # Check to see if start_date is valid. This must be done after date adjustment.
-  if (as.POSIXct(Sys.time(), tz=tz) < start_date || start_date < NOAA_GEFS_Start_Date) {
+  #Check to see if start_date is valid. This must be done after date adjustment.
+  if (as.POSIXct(Sys.time(), tz="UTC") < start_date || start_date < NOAA_GEFS_Start_Date) {
     PEcAn.logger::logger.severe(sprintf('Start date (%s) exceeds the NOAA GEFS range (%s to %s).',
                                         start_date,
                                         NOAA_GEFS_Start_Date, Sys.Date()))
@@ -79,6 +65,7 @@ NOAA_GEFS <- function(outfolder, lat.in, lon.in, sitename,
   if (lubridate::hour(end_date) > 23) {  #Done separately from the previous if statement in order to have more specific error messages.
     PEcAn.logger::logger.severe(sprintf("End time %s is not a valid time", lubridate::hour(end_date)))
   }
+  #End date/time error checking
   
   # End date/time error checking
   
@@ -100,12 +87,13 @@ NOAA_GEFS <- function(outfolder, lat.in, lon.in, sitename,
   noaa_data <- list()
   for (i in 1:length(noaa_var_names)) {
     print(noaa_var_names[i])
-    noaa_data[[i]] = rnoaa::gefs(noaa_var_names[i], 
+    noaa.mat <- rnoaa::gefs(noaa_var_names[i], 
                                  lat.in, lon.in, 
-                                 raw=TRUE, 
+                                 raw = TRUE, 
                                  time_idx = seq_len(increments), 
                                  forecast_time = forecast_hour, 
-                                 date=format(start_date, "%Y%m%d"))$data
+                                 date = format(start_date, "%Y%m%d"))$data
+    noaa_data[[i]] <- noaa.mat
   }
   
   #Fills in data with NaNs if there happens to be missing columns.
