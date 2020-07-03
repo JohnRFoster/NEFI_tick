@@ -23,7 +23,7 @@ library(boot)
 
 
 
-predict_one <- function(type, site, met.variable, params, ic, data, 
+predict_one <- function(type, site, met.variable, params, ic, data, process.type,
                         A_func = NULL, A = NULL, dir = "", HB = FALSE){
   
   source(paste0(dir, "Functions/site_data_met.R"))
@@ -56,7 +56,7 @@ predict_one <- function(type, site, met.variable, params, ic, data,
   pred <- array(dim = c(3,N_est-1,Nmc))
   
   # partition samples
-  ua <- ua_parts(params, ic, type)
+  ua <- ua_parts(params, ic, type, process.type)
   
   # get A
   if(is.null(A)){
@@ -96,7 +96,14 @@ predict_one <- function(type, site, met.variable, params, ic, data,
       ## predict new
       obs <- as.matrix(c(l,n,a),3,1)
       Ex <- TRANS %*% obs
-      est.mvnorm <- rmvnorm(1,Ex,ua$SIGMA[,,m])
+      est.mvnorm <- rep(NA, 3)
+      if(process.type == "multi"){
+        est.mvnorm <- rmvnorm(1,Ex,ua$SIGMA[,,m])  
+      } else if(process.type == "independent"){
+        est.mvnorm[1] <- rnorm(1,Ex[1],ua$tau.l[m])  
+        est.mvnorm[2] <- rnorm(1,Ex[2],ua$tau.n[m])  
+        est.mvnorm[3] <- rnorm(1,Ex[3],ua$tau.a[m])  
+      }
       
       b.larva <- rbinom(1, 1, obs.prob$theta.larva[m,t+1])
       b.nymph <- rbinom(1, 1, obs.prob$theta.nymph[m,t+1])
