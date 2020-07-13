@@ -1,5 +1,8 @@
 library(plantecophys)
-site_data_met <- function(site, met.variable, data, obs.model = TRUE){
+library(dplyr)
+library(lubridate)
+
+site_data_met <- function(site, met.variable, data, obs.model = TRUE, time.effect = NULL){
   # index for site
   dat.jags <- list()
   if(site == "Green Control"){
@@ -42,7 +45,18 @@ site_data_met <- function(site, met.variable, data, obs.model = TRUE){
     dat.jags$met.range <- range(dat.jags$met, na.rm = TRUE)
   }
   
-  
+  if(!is.null(time.effect)){
+    raw.dat <- read.csv("../tick_cleaned")
+    raw.dat$DATE <- as.Date(raw.dat$DATE) # convert to date
+    
+    dates <- raw.dat %>% 
+      filter(Grid == site) %>% 
+      select(DATE)
+    if(time.effect == "month"){
+      dat.jags$month.index <- lubridate::month(dates[,1])
+      dat.jags$n.months <- unique(lubridate::month(dates[,1]))
+    }  
+  }
   
   if(obs.model){
     obs.index <- c(1, dat.jags$dt.index)
@@ -54,5 +68,15 @@ site_data_met <- function(site, met.variable, data, obs.model = TRUE){
     dat.jags$met.obs.miss <- met.obs.miss
     dat.jags$met.obs.range <- met.obs.range
   }
+  
+  seq.days <- matrix(NA, dat.jags$N_est - 1, max(dat.jags$df, na.rm = TRUE))
+  for (i in 1:(dat.jags$N_est - 1)) {
+    xx <- (dat.jags$dt.index[i + 1] - 1):dat.jags$dt.index[i]
+    seq.days[i, 1:length(xx)] <- xx
+  }
+  dat.jags$seq.days <- seq.days
+  
+  dat.jags$R <- diag(1, 3, 3)
+  
   return(dat.jags)
 }
