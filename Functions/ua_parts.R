@@ -1,5 +1,5 @@
 
-ua_parts <- function(params, ic, type, process.type){
+ua_parts <- function(params, ic, type, process.type = "multi"){
   
   Nmc <- nrow(params)
   ua.parts <- list()
