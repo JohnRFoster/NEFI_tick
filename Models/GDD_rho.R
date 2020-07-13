@@ -28,7 +28,10 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
   data <- cary_ticks_met_JAGS()
   
   # subset data to site.run and met variable of interest
-  data <- site_data_met(site = site.run, met.variable = met.proc, data)
+  data <- site_data_met(site = site.run, 
+                        met.variable = met.proc, 
+                        data = data,
+                        time.effect = "month")
   
   # met.diff <- rep(NA, data$N_days)
   # for(m in 2:length(data$met)){
@@ -37,15 +40,6 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
   # data$met.diff <- met.diff
   # data$met.mis.diff <- which(is.na(met.diff))
   # data$met.range.diff <- range(met.diff, na.rm = TRUE)
-  
-  seq.days <- matrix(NA, data$N_est - 1, max(data$df, na.rm = TRUE))
-  for (i in 1:(data$N_est - 1)) {
-    xx <- (data$dt.index[i + 1] - 1):data$dt.index[i]
-    seq.days[i, 1:length(xx)] <- xx
-  }
-  data$seq.days <- seq.days
-  
-  # data$R <- diag(1, 3, 3)
   
   # which transitions are set and which are variable
   data$rho.n.mu <- 500
@@ -86,20 +80,18 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
     "grow.ln.mu",
     "grow.na.mu",
     "repro.mu",
-    # "SIGMA",
+    "SIGMA",
     "theta.nymph",
     "theta.adult",
     "beta.l.obs",
-    "tau_l",
-    "tau_n",
-    "tau_a",
     "rho.l",
     "rho.n",
-    "rho.a"
+    "rho.a",
+    "alpha.month"
   )
 
   model = " model {
-  
+
   ### global priors
   phi.l.mu ~ dnorm(larva.mean,larva.prec)               # larvae survival
   phi.n.mu ~ dnorm(nymph.mean,nymph.prec)               # nymph survival
@@ -107,26 +99,28 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
   grow.ln.mu ~ dnorm(-6, 1)             # larvae -> nymph transition
   grow.na.mu ~ dnorm(-6, 1)             # nymph -> adult transition
   repro.mu ~ dnorm(7, 0.01) T(0,)              # adult -> larvae transition (reproduction)
-  rho.l ~ dnorm(rho.l.mu, rho.prec) T(0,)
-  rho.n ~ dnorm(rho.n.mu, rho.prec) T(0,)
-  rho.a ~ dnorm(rho.a.mu, rho.prec) T(0,)
+  rho.l ~ dnorm(rho.l.mu, rho.prec)
+  rho.n ~ dnorm(rho.n.mu, rho.prec)
+  rho.a ~ dnorm(rho.a.mu, rho.prec)
 
   ### precision priors
-  # SIGMA ~ dwish(R, 4)         # mvn [3 x 3] site process
-  tau_l ~ dgamma(0.001, 0.001)
-  tau_n ~ dgamma(0.001, 0.001)
-  tau_a ~ dgamma(0.001, 0.001)
+  SIGMA ~ dwish(R, 4)         # mvn [3 x 3] site process
   
+  ### random month prior
+  for(month in n.months){
+    alpha.month[month] ~ dnorm(0, 0.001)
+  }
+
   ## observation regression priors
   beta.l.obs ~ dnorm(0, 0.001) T(1E-10,)
   theta.nymph ~ dunif(0,1)
   theta.adult ~ dunif(0,1)
-  
+
   ### first latent process
   x[1, 1] ~ dpois(1)
   x[2, 1] ~ dpois(10)
   x[3, 1] ~ dpois(1)
-  
+
   ## missing temperature model - observation
   for(t in met.obs.miss){
     met.obs[t] ~ dunif(met.obs.range[1], met.obs.range[2])
@@ -139,85 +133,76 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
   # for(t in met.mis.diff){
   #   met.diff[t] ~ dunif(met.range.diff[1], met.range.diff[2])
   # }
-  
+
   logit(phi.11) <- phi.l.mu
   logit(phi.22) <- phi.n.mu
   logit(l2n) <- grow.ln.mu
   logit(n2a) <- grow.na.mu
-  
+
   ### define parameters
   for(t in 1:N_days){   # loop over every day in time series
+
+    theta.21[t] <- ifelse((gdd[t] >= rho.n) && (gdd[t] <= 2500),l2n,0)
+    theta.32[t] <- ifelse((gdd[t] <= 1000) || (gdd[t] >= rho.a),n2a,0)
+    lambda[t] <- ifelse((gdd[t] >= rho.l) && (gdd[t] <= 2500),repro.mu,0)
   
-  ## Survival parameters are random intercept plus fixed effect on temperature
-  ## transition is a threshold (on if within gdd window, off otherwise)
-  
-  theta.21[t] <- ifelse((gdd[t] >= rho.n) && (gdd[t] <= 2500),l2n,0)
-  theta.32[t] <- ifelse((gdd[t] <= 1000) || (gdd[t] >= rho.a),n2a,0)
-  lambda[t] <- ifelse((gdd[t] >= rho.l) && (gdd[t] <= 2500),repro.mu,0)
-  
-  A.day[1,1,t] <- phi.11*(1-theta.21[t])
-  A.day[2,1,t] <- phi.11*theta.21[t]
-  A.day[2,2,t] <- phi.22*(1-theta.32[t])
-  A.day[3,2,t] <- phi.22*theta.32[t]
-  logit(A.day[3,3,t]) <- phi.a.mu
-  A.day[1,3,t] <- lambda[t]
-  A.day[1,2,t] <- 0
-  A.day[2,3,t] <- 0
-  A.day[3,1,t] <- 0
+    A.day[1,1,t] <- phi.11*(1-theta.21[t])
+    A.day[2,1,t] <- phi.11*theta.21[t]
+    A.day[2,2,t] <- phi.22*(1-theta.32[t])
+    A.day[3,2,t] <- phi.22*theta.32[t]
+    logit(A.day[3,3,t]) <- phi.a.mu
+    A.day[1,3,t] <- lambda[t]
+    A.day[1,2,t] <- 0
+    A.day[2,3,t] <- 0
+    A.day[3,1,t] <- 0
   }
-  
+
   ### aggregate daily matrix between sampling events
-  
   for(i in 1:(N_est-1)){  ## number of days to estimate latent state
+
+    for(day in seq.days[i,1]){
+      TRANS[1:3,1:3,day] <- A.day[,,day] %*% A.day[,,day-1]
+    }
   
-  for(day in seq.days[i,1]){
-  TRANS[1:3,1:3,day] <- A.day[,,day] %*% A.day[,,day-1]
+    for(day in seq.days[i,2:df[i]]){
+      TRANS[1:3,1:3,day] <- TRANS[1:3,1:3,day+1] %*% A.day[,,day]
+    }
   }
-  
-  for(day in seq.days[i,2:df[i]]){
-  TRANS[1:3,1:3,day] <- TRANS[1:3,1:3,day+1] %*% A.day[,,day]
-  }
-  }
-  
-  
+
   ### Process Model
-  
   for(t in 1:(N_est-1)){
+
+    # expected number questing
+    Ex[1:3,t] <- TRANS[1:3,1:3,dt.index[t]] %*% x[1:3,t] + alpha.month[month.index[t]]
   
-  # expected number questing
-  Ex[1:3,t] <- TRANS[1:3,1:3,dt.index[t]] %*% x[1:3,t]
-  
-  # process error
-  # p[1:3,t] ~ dmnorm(Ex[1:3,t], SIGMA)
-  p[1,t] ~ dnorm(Ex[1,t], tau_l)
-  p[2,t] ~ dnorm(Ex[2,t], tau_n)
-  p[3,t] ~ dnorm(Ex[3,t], tau_a)
-  x[1,t+1] <- max(p[1,t], 0)
-  x[2,t+1] <- max(p[2,t], 0)
-  x[3,t+1] <- max(p[3,t], 0)
+    # process error
+    p[1:3,t] ~ dmnorm(Ex[1:3,t], SIGMA)
+    x[1,t+1] <- max(p[1,t], 0)
+    x[2,t+1] <- max(p[2,t], 0)
+    x[3,t+1] <- max(p[3,t], 0)
   }
-  
+
   ### Data Model ###
   for(t in 1:N_est){
+
+    ## fit the blended model to observed data
+    y[1,t] ~ dpois(m[1,t])
+    y[2,t] ~ dpois(m[2,t])
+    y[3,t] ~ dpois(m[3,t])
   
-  ## fit the blended model to observed data
-  y[1,t] ~ dpois(m[1,t])
-  y[2,t] ~ dpois(m[2,t])
-  y[3,t] ~ dpois(m[3,t])
+    ## blend the poisson and zero inflation models
+    m[1,t] <- x[1,t]*b.larva[t] + 1E-10
+    m[2,t] <- x[2,t]*b.nymph[t] + 1E-10
+    m[3,t] <- x[3,t]*b.adult[t] + 1E-10
   
-  ## blend the poisson and zero inflation models
-  m[1,t] <- x[1,t]*b.larva[t] + 1E-10
-  m[2,t] <- x[2,t]*b.nymph[t] + 1E-10
-  m[3,t] <- x[3,t]*b.adult[t] + 1E-10
+    ## observation probability based on temperature
+    theta.larva[t] <- 1 / (1 + beta.l.obs*(met.obs[t])^2)
   
-  ## observation probability based on temperature
-  theta.larva[t] <- 1 / (1 + beta.l.obs*(met.obs[t])^2)
-  
-  ## binary outcome of observation by life stage
-  b.larva[t] ~ dbern(theta.larva[t])
-  b.nymph[t] ~ dbern(theta.nymph)
-  b.adult[t] ~ dbern(theta.adult)
-  
+    ## binary outcome of observation by life stage
+    b.larva[t] ~ dbern(theta.larva[t])
+    b.nymph[t] ~ dbern(theta.nymph)
+    b.adult[t] ~ dbern(theta.adult)
+
   } # t
 }"
 
