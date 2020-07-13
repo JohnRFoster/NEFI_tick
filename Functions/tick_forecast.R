@@ -37,10 +37,28 @@ tick_forecast <- function(params, ic, gdd, met.data, obs.temp, n.days){
       phi.33 <- boot::inv.logit(ua$phi.a.mu[m])
     }
     
+    if("rho.l" %in% names(ua)){
+      larva.start <- ua$rho.l
+    } else {
+      larva.start <- rep(1500, Nmc)
+    }
+    
+    if("rho.n" %in% names(ua)){
+      nymph.start <- ua$rho.n
+    } else {
+      nymph.start <- rep(500, Nmc)
+    }
+    
+    if("rho.a" %in% names(ua)){
+      adult.start <- ua$rho.n
+    } else {
+      adult.start <- rep(2500, Nmc)
+    }
+    
     # reproduction and transition
-    lambda <- ifelse(gdd[,1] >= 1500 & gdd[,1] <= 2500, ua$repro.mu[m], 0) 
-    theta.32 <- ifelse(gdd[,1] <= 1000 | gdd[,1] >= 2500, inv.logit(ua$grow.na.mu[m]), 0) 
-    theta.21 <- ifelse(gdd[,1] >= 500 & gdd[,1] <= 2500, inv.logit(ua$grow.ln.mu[m]), 0)  
+    lambda <- ifelse(gdd[,1] >= larva.start[m] & gdd[,1] <= 2500, ua$repro.mu[m], 0) 
+    theta.32 <- ifelse(gdd[,1] <= 1000 | gdd[,1] >= adult.start[m], inv.logit(ua$grow.na.mu[m]), 0) 
+    theta.21 <- ifelse(gdd[,1] >= nymph.start[m] & gdd[,1] <= 2500, inv.logit(ua$grow.ln.mu[m]), 0)  
     
     # build transition matrix
     A[1,1,] <- phi.11*(1-theta.21)
@@ -53,7 +71,7 @@ tick_forecast <- function(params, ic, gdd, met.data, obs.temp, n.days){
    
     for(t in 1:n.days){    
       
-      # aggrigate transition matricies
+      # aggregate transition matrices
       if (t == 1){
         TRANS <- A[,,1]
       } else if (t == 2){
