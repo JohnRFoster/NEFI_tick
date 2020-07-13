@@ -15,7 +15,8 @@ create_ncdf_tick <- function(ncfname, pred, start.date, n.days, Nmc, data_assimi
   # Set dimensions
   ens <- 1:Nmc               # number of ensembles
   states <- 1                # each life stage gets own dim
-  timestep <- 1:n.days       # days forecasted
+  timestep <- 1:(n.days)       # days forecasted + initial condition
+  weight.length <- 1:(n.days-1)
   
   ensdim <- ncdim_def("ens", 
                       units = "",
@@ -29,6 +30,10 @@ create_ncdf_tick <- function(ncfname, pred, start.date, n.days, Nmc, data_assimi
                        units = '1 day', 
                        longname = 'timestep',
                        vals = timestep)
+  weightdim <- ncdim_def("weights",
+                         units = "normalized_weight",
+                         longname = "normalized_weight_after_data_assimilation",
+                         vals = weight.length)
   dimnchar   <- ncdim_def("nchar",   "", 
                           1:nchar(as.character(time[1])), 
                           create_dimvar = FALSE)
@@ -62,7 +67,7 @@ create_ncdf_tick <- function(ncfname, pred, start.date, n.days, Nmc, data_assimi
                              prec = "single")
   def_list[[5]] <- ncvar_def(name =  "data_assimilation",
                              units = "logical",
-                             dim = list(timedim),
+                             dim = list(weightdim),
                              missval = fillvalue,
                              longname = '1 = data assimilation used in timestep',
                              prec = "single")
