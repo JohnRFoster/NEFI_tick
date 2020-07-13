@@ -21,19 +21,19 @@ cat("=====", sitename, "downloaded =====\n")
 
 
 
+# dat <- nc_open("../NOAA_Stations/Cary/NOAA_Observed.CaryInstitute.2020-06-26.nc")
+# ncvar_get(dat, "TMIN")
+
 
 # for getting more than one day
 # day.vec <- seq.Date(ymd("2020-04-01"), ymd("2020-06-26"), by = 1)
-
-# for(i in seq_along(day.vec)){
-#   NOAA_observed(outfolder, sitename, station.id, day.2.grab = day.vec[i])
-# }
+# NOAA_observed(outfolder, sitename, station.id, day.2.grab = day.vec)
 
 
 
 
-dat <- nc_open("../NOAA_Stations/Cary/NOAA_Observed.CaryInstitute.2020-06-26.nc")
-ncvar_get(dat, "TMIN")
+
+
 
 
 
