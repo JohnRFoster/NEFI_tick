@@ -2,6 +2,9 @@ library(LaplacesDemon)
 library(plantecophys)
 library(ecoforecastR)
 library(tidyverse)
+library(parallel)
+library(abind)
+library(mvtnorm)
 
 script.start <- Sys.time()
 
@@ -11,7 +14,7 @@ source("Functions/ua_parts.R")
 source("Functions/obs_prob.R")
 source("Functions/Future_Met.R")
 source("Functions/get_ticks_2006_2018.R")
-source("Functions/tick_forecast.R")
+source("Functions/tick_forecast_parallel.R")
 source("Functions/create_ncdf_tick.R")
 
 # Forecast_id <- uuid::UUIDgenerate() # ID that applies to the specific forecast
@@ -19,8 +22,8 @@ Forecast_id <- "601144a5-ed57-4166-b943-38bfd66f9081"
 ForecastProject_id <- 20200520 # Some ID that applies to a set of forecasts
 
 ## read array job number to paste into output file
-# grid.id <- as.numeric(Sys.getenv("SGE_TASK_ID"))
-grid.id <- 1 # for test
+grid.id <- as.numeric(Sys.getenv("SGE_TASK_ID"))
+# grid.id <- 1 # for test
 
 # full site name, match to array job number
 if(grid.id == 1) grid <- "Green Control" 
@@ -32,13 +35,13 @@ cat("\n--Running Tick Hindcast for", grid, "--\n")
 grid.short <- gsub(" Control", "", grid) # site sub directory name
 grid.no.space <- gsub(" ", "", grid) # site name without spaces
 
-met.driver <- "vpd"
+met.driver <- NULL
 
 # load dir
 in.dir <- "../FinalOut/A_Correct"
-model.structure <- "ObsProcModels"
-model.drivers <- "Obs_L1N0A0.Proc_AdultVPD" 
-model.name <- paste0("Combined_thinMat_Obs_L1.N0.A0_Proc_AdultVPD_",
+model.structure <- "RhoModels"
+model.drivers <- "RhoAllStart" 
+model.name <- paste0("Combined_thinMat_RhoAllStart_",
                      grid.no.space,
                      ".RData")
 
@@ -49,7 +52,15 @@ load(file.path(in.dir,
                grid.short, 
                model.name))
 
-Nmc <- 1000
+### parallel set-up
+n.slots <- as.numeric(Sys.getenv("NSLOTS")) # read number of parallel slots (cores requested)
+cat("Number of slots:", n.slots, "\n")
+Nmc.per.node <- 5000
+Nmc <- Nmc.per.node * n.slots
+
+cat("Running", Nmc.per.node, "ensembles per node\n")
+cat(Nmc, " total ensembles\n")
+
 draw <- sample.int(nrow(params.mat), Nmc, replace = TRUE)
 params <- params.mat[draw,]
 states <- predict.mat[draw,]
@@ -62,6 +73,9 @@ out.dir <- file.path("../FinalOut/DA_Runs/Tick_Hindcast",
                      model.drivers,
                      grid.short)
 
+if(!dir.exists(out.dir)) dir.create(paste0(out.dir, "/"), recursive = TRUE)
+
+# name for saving parameters
 param.name <- paste0(grid.short, model.drivers, "_parameters.RData")
 
 ## Load Future ticks
@@ -97,16 +111,16 @@ cat("Larva initial condition range:", range(ic[,1]), "\n")
 cat("Nymph initial condition range:", range(ic[,2]), "\n")
 cat("Adult initial condition range:", range(ic[,3]), "\n")
 
-t <- 1 # for testing
-like <- matrix(1, Nmc, length(days))
+# t <- 1 # for testing
 resample <- rep(NA, length(days))
 weight.ncdf <- rep(1, Nmc) # weights for ncdf
+norm.weights <- rep(log(1/Nmc), Nmc) # log scale
 index <- 1
 check.day <- rep(NA, length(days))
 quants <- c(0.025, 0.25, 0.5, 0.75, 0.975)
 
 for (t in 1:(length(days)-1)) {
-# for (t in 1:10) {
+# for (t in 1:10) { # for testing
   
   ### forecast step ###
   forecast_issue_time <- as.Date(days[t])
@@ -131,9 +145,20 @@ for (t in 1:(length(days)-1)) {
   
   n.days <- nrow(gdd) # number of days in forecast
   
-  fore <- tick_forecast(params, ic, gdd, met.data, obs.temp, n.days) # run forecast
-  predict <- fore[,check.day[t],] # pull out prediction for DA
-  predict[predict == 0] <- 1E-10  # need to converte 0s for log.like calculation
+  # run forecast in parallel
+  cl <- makeCluster(n.slots) # start cluster 
+  datapieces <- clusterSplit(cl, 1:Nmc) # list to split data into equal chunks
+  clusterExport(cl, c("params", "ic", "gdd", "met.data", "obs.temp", "n.days", "ua_parts", "obs_prob")) # export required objects
+  fore <- parLapply(cl, datapieces, tick_forecast_parallel) # run forecast on cluster nodes
+  stopCluster(cl) # stop cluster 
+  
+  # combine forecast output
+  all.fore <- fore[[1]]
+  for (slot in 2:n.slots) {
+    all.fore <- abind(all.fore, fore[[slot]], along = 3)
+  }
+  predict <- all.fore[,check.day[t],] # pull out prediction for DA
+  predict[predict == 0] <- 1E-10  # need to convert 0s for log.like calculation
   
   ### analysis step ###
   cat("\n-----------------------\n")
@@ -162,19 +187,20 @@ for (t in 1:(length(days)-1)) {
   obs.prob.mat[2,] <- obs.prob$theta.nymph[,1]
   obs.prob.mat[3,] <- obs.prob$theta.adult[,1]
   
+  ## doing obs prob twice???
+  
   # likelihood 
   cum.like <- rep(NA, Nmc) # store
   ens.like <- matrix(NA, Nmc, 3) # store
   for (i in 1:Nmc) {
     omega <- 1 - min(obs.prob.mat[,i], 1)
-    ens.like[i, ] <- dgpois(observation, predict[,i], omega, log = T) # likelihood
-    # like.mu <- exp(mean(ens.like[i, ])) # mean weight for each ensemble
-    # like[i, index] <- like.mu # store
-    # cum.like[i] <- prod(like[i, 1:index]) # convert to cumulative likelihood (weights)
+    ens.like[i, ] <- dgpois(observation, predict[,i], omega, log = TRUE) # likelihood
   }
   
-  norm.life.stage <- apply(ens.like, 2, function(x) exp(x) / sum(exp(x)))
-  norm.weights <- rowMeans(norm.life.stage)
+  log.like.mu <- apply(ens.like, 1, mean) # mean weight for each ensemble
+  w <- exp(norm.weights)*exp(log.like.mu) # previous normalized weights * current weights
+  norm.weights <- w/sum(w) # normalize 
+
   print(sum(norm.weights))
 
   # normalize and store weights to determine if we resample or not
@@ -182,7 +208,7 @@ for (t in 1:(length(days)-1)) {
   # like[, index] <- norm.weights             # store weights to carry over
   effect.size <- 1 / sum(norm.weights ^ 2)  # effective sample size
   cat("Effective Sample Size:", effect.size, "\n")
-  
+  weight.ncdf <- norm.weights
   # logL = rep(NA, Nmc)
   # for (i in 1:Nmc) {
   #   logL[i] = mean(dgpois(observation, predict[,i], 1-obs.prob.mat[,i], log = T))
@@ -232,7 +258,7 @@ for (t in 1:(length(days)-1)) {
     ## Kernel smoothing (to avoid ensemble members with identical parameters)
     h <- 0.9
     e <- rmvnorm(n = Nmc, mean = rep(0, ncol(X)), sigma = SIGMA)
-    Xstar = t(Xbar + h*(t(X)-Xbar) + t(e)*Xbar*(1-h))
+    Xstar <- t(Xbar + h*(t(X)-Xbar) + t(e)*Xbar*(1-h))
     
     
     # ic after smoothing
@@ -252,8 +278,7 @@ for (t in 1:(length(days)-1)) {
     params <- cbind(params.new.sigma, Xstar[,-c(1:3)])
     params.hist[[index]] <- params # store parameters
     
-    like <- matrix(1, Nmc, length(days)) # reset weights
-    weight.ncdf <- rep(1, Nmc) # weights for ncdf and reset
+    norm.weights <- rep(log(1/Nmc), Nmc) # reset weights
     ua <- ua_parts(params, ic, c("parameter", "ic", "process")) # new uncertainty partitioning
   }
   
@@ -264,9 +289,9 @@ for (t in 1:(length(days)-1)) {
   # write netCDF
   create_ncdf_tick(
     file.path(out.dir, ncfname),
-    fore,
+    all.fore,
     forecast_issue_time,
-    n.days,
+    n.days+1, # add one for IC storage
     Nmc,
     data_assimilation,
     weight.ncdf,
