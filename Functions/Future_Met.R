@@ -26,7 +26,7 @@ future_met <- function(site, gdd.base = 10){
   last.index <- which(met$DATE == last.day[s])
   met.seq <- last.index:which(met$DATE == "2017-12-31") # all 2018 data is NA
   
-  met <- met[met.seq,]
+  met <- met[1:which(met$DATE == "2017-12-31"),]
   
   met$DATE <- as.Date(met$DATE)
   year <- format(as.Date(met$DATE, format="%Y-%m-%d"),"%Y")[met.seq]
@@ -73,18 +73,18 @@ future_met <- function(site, gdd.base = 10){
   precip <- scale_mean(met$TOT_PREC)
 
   # create data frame
-  future.met <- data.frame(max.temp = max.temp$var,
-                           max.temp.scale = max.temp$var.scale,
-                           min.temp = min.temp$var,
-                           min.temp.scale = min.temp$var.scale,
-                           max.rh = max.rh$var,
-                           max.rh.scale = max.rh$var.scale,
-                           min.rh = min.rh$var,
-                           min.rh.scale = min.rh$var.scale,
-                           precip = precip$var,
-                           cum.gdd = cum.gdd,
-                           year.index = met$year,
-                           date = met$DATE)
+  future.met <- data.frame(max.temp = max.temp$var[met.seq],
+                           max.temp.scale = max.temp$var.scale[met.seq],
+                           min.temp = min.temp$var[met.seq],
+                           min.temp.scale = min.temp$var.scale[met.seq],
+                           max.rh = max.rh$var[met.seq],
+                           max.rh.scale = max.rh$var.scale[met.seq],
+                           min.rh = min.rh$var[met.seq],
+                           min.rh.scale = min.rh$var.scale[met.seq],
+                           precip = precip$var[met.seq],
+                           cum.gdd = cum.gdd[met.seq],
+                           year.index = met$year[met.seq],
+                           date = met$DATE[met.seq])
   
   return(future.met)
 }
