@@ -2,7 +2,8 @@ library(plantecophys)
 library(dplyr)
 library(lubridate)
 
-site_data_met <- function(site, met.variable, data, obs.model = TRUE, time.effect = NULL){
+site_data_met <- function(site, met.variable, data, dir = "", 
+                          obs.model = TRUE, time.effect = NULL){
   # index for site
   dat.jags <- list()
   if(site == "Green Control"){
@@ -46,7 +47,7 @@ site_data_met <- function(site, met.variable, data, obs.model = TRUE, time.effec
   }
   
   if(!is.null(time.effect)){
-    raw.dat <- read.csv("../tick_cleaned")
+    raw.dat <- read.csv(paste0(dir, "../tick_cleaned"))
     raw.dat$DATE <- as.Date(raw.dat$DATE) # convert to date
     
     dates <- raw.dat %>% 
