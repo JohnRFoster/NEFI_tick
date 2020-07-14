@@ -27,14 +27,15 @@ predict_one <- function(type, site, met.variable, params, ic, data, process.type
                         A_func = NULL, A = NULL, dir = "", HB = FALSE){
   
   source(paste0(dir, "Functions/site_data_met.R"))
-  source(paste0(dir, "Functions/cary_tick_met_JAGS.R"))
+  # source(paste0(dir, "Functions/cary_tick_met_JAGS.R"))
   source(paste0(dir, "Functions/ua_parts.R"))
   source(paste0(dir, "Functions/obs_prob.R"))
+  source(paste0(dir, "Functions/get_month_effect.R"))
   
   # number of samples
   Nmc <- nrow(params)
   
-  data <- site_data_met(site, met.variable, data)
+  data <- site_data_met(site, met.variable, data, dir = dir, time.effect = "month")
   
   N_est <- data$N_est
   N_days <- data$N_day
@@ -96,6 +97,13 @@ predict_one <- function(type, site, met.variable, params, ic, data, process.type
       ## predict new
       obs <- as.matrix(c(l,n,a),3,1)
       Ex <- TRANS %*% obs
+      
+      # check for month effect in jags output and add to Ex
+      if(any(grepl("alpha.month", names(ua)))){
+        month.effect <- get_month_effect(t, m, ua, data$month.index)
+        Ex <- Ex + month.effect
+      }
+      
       est.mvnorm <- rep(NA, 3)
       if(process.type == "multi"){
         est.mvnorm <- rmvnorm(1,Ex,ua$SIGMA[,,m])  
@@ -110,9 +118,9 @@ predict_one <- function(type, site, met.variable, params, ic, data, process.type
       b.adult <- rbinom(1, 1, obs.prob$theta.adult[m,t+1])
       
       ## Observation model
-      pred[1,t,m] <- max(est.mvnorm[1], 0)*b.larva + 1E-10 
-      pred[2,t,m] <- max(est.mvnorm[2], 0)*b.nymph + 1E-10 
-      pred[3,t,m] <- max(est.mvnorm[3], 0)*b.adult + 1E-10 
+      pred[1,t,m] <- max(est.mvnorm[1], 0)*b.larva #+ 1E-10 
+      pred[2,t,m] <- max(est.mvnorm[2], 0)*b.nymph #+ 1E-10 
+      pred[3,t,m] <- max(est.mvnorm[3], 0)*b.adult #+ 1E-10 
       
     }
   }
