@@ -48,14 +48,14 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
   
   # get survival estimates
   survival <- get_survival(larva.driver = NULL,
-                           nymph.driver = met.proc)
+                           nymph.driver = NULL)
   data$larva.mean <- survival$larva.survival.mean
   data$larva.prec <- survival$larva.survival.prec
   data$nymph.mean <- survival$nymph.survival.mean
   data$nymph.prec <- survival$nymph.survival.prec
   
-  data$nymph.beta.mu <- survival$nymph.beta.mean
-  data$nymph.beta.prec <- survival$nymph.beta.prec
+  # data$nymph.beta.mu <- survival$nymph.beta.mean
+  # data$nymph.beta.prec <- survival$nymph.beta.prec
   
   inits <- function() {
     list(
@@ -78,7 +78,7 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
     "phi.l.mu",
     "phi.n.mu",
     "phi.a.mu",
-    "beta.n",
+    "beta.a",
     "grow.ln.mu",
     "grow.na.mu",
     "repro.mu",
@@ -115,7 +115,7 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
     }
   }
   
-  beta.n ~ dnorm(nymph.beta.mu, nymph.beta.prec)
+  beta.a ~ dnorm(0, 0.01)
 
   ## observation regression priors
   beta.l.obs ~ dnorm(0, 0.001) T(1E-10,)
@@ -142,6 +142,7 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
   # }
   
   logit(phi.11) <- phi.l.mu
+  logit(phi.22) <- phi.n.mu
   logit(l2n) <- grow.ln.mu
   logit(n2a) <- grow.na.mu
 
@@ -151,13 +152,12 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
     theta.21[t] <- ifelse((gdd[t] >= rho.n) && (gdd[t] <= 2500),l2n,0)
     theta.32[t] <- ifelse((gdd[t] <= 1000) || (gdd[t] >= rho.a),n2a,0)
     lambda[t] <- ifelse((gdd[t] >= rho.l) && (gdd[t] <= 2500),repro.mu,0)
-    logit(phi.22[t]) <- phi.n.mu + beta.n*met[t]
   
     A.day[1,1,t] <- phi.11*(1-theta.21[t])
     A.day[2,1,t] <- phi.11*theta.21[t]
-    A.day[2,2,t] <- phi.22[t]*(1-theta.32[t])
-    A.day[3,2,t] <- phi.22[t]*theta.32[t]
-    logit(A.day[3,3,t]) <- phi.a.mu
+    A.day[2,2,t] <- phi.22*(1-theta.32[t])
+    A.day[3,2,t] <- phi.22*theta.32[t]
+    logit(A.day[3,3,t]) <- phi.a.mu + beta.a*met[t]
     A.day[1,3,t] <- lambda[t]
     A.day[1,2,t] <- 0
     A.day[2,3,t] <- 0
