@@ -22,7 +22,6 @@ source("Functions/cary_tick_met_JAGS.R") # get data
 source("Functions/site_data_met.R") # subset data for independent fits
 source("Functions/RunMCMC_Model.R") # run mcmc and check for convergence / burnin
 source("Functions/get_survival.R") # run mcmc and check for convergence / burnin
-# source("Functions/RunMCMC_runjags.R") # run mcmc and check for convergence / burnin
 
 run_model <- function(site.run, met.proc, n.adapt, n.chains) {
   data <- cary_ticks_met_JAGS()
@@ -107,9 +106,12 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
   SIGMA ~ dwish(R, 4)         # mvn [3 x 3] site process
   
   ### random month prior
-  for(month in n.months){
-    alpha.month[month] ~ dnorm(0, 0.001)
+  for(s in 1:3){
+    for(month in n.months){
+      alpha.month[s,month] ~ dnorm(0, 0.001)
+    }
   }
+  
 
   ## observation regression priors
   beta.l.obs ~ dnorm(0, 0.001) T(1E-10,)
@@ -173,7 +175,7 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
   for(t in 1:(N_est-1)){
 
     # expected number questing
-    Ex[1:3,t] <- TRANS[1:3,1:3,dt.index[t]] %*% x[1:3,t] + alpha.month[month.index[t]]
+    Ex[1:3,t] <- TRANS[1:3,1:3,dt.index[t]] %*% x[1:3,t] + alpha.month[1:3, month.index[t]]
   
     # process error
     p[1:3,t] ~ dmnorm(Ex[1:3,t], SIGMA)
