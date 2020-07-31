@@ -11,8 +11,11 @@ library(PEcAn.logger)
 library(PEcAn.remote)
 
 source("Functions/NOAA_GEFS.R")
+overwrite <- FALSE
 
 cat("Start time:", format(Sys.time(), "%Y-%m-%d %H:%M"), "\n")
+
+today <- Sys.Date()
 
 # define sitenames
 sitename <- c(
@@ -38,7 +41,11 @@ lon.in <- c(
   -73.7338     # Cary Institute
 )
 
-today <- Sys.Date()
+# timezone for each site
+tz <- c(
+  "America/New_York",  # Harvard Forest
+  "America/New_York"   # Cary Institute
+)
 
 # download GEFS for each site and save results
 for(site in seq_along(sitename)){
@@ -46,7 +53,7 @@ for(site in seq_along(sitename)){
   # don't need to run if already downloaded
   check.folder <- paste("NOAA_GEFS", sitename[site], today, sep = ".")
   check <- file.path(outfolder[site], check.folder)
-  if(dir.exists(check)){
+  if(dir.exists(check) & !overwrite){
     cat(sitename[site], "already downloaded!\n")
     next
   }
@@ -57,13 +64,15 @@ for(site in seq_along(sitename)){
     outfolder[site],
     lat.in[site],
     lon.in[site],
-    sitename[site]
+    sitename[site],
+    time.zone = tz[site],
   )
   
   save(results, 
        file = paste0(outfolder[site], "/results.RData"))
   
   cat("=====", sitename[site], "downloaded =====\n")
+  
 }
 
 cat("\n ----- END ----- \n\n")
