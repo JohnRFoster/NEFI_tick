@@ -3,6 +3,7 @@
 NOAA_GEFS <- function(outfolder, lat.in, lon.in, sitename, 
                       start_date = Sys.time(), 
                       end_date = (as.POSIXct(start_date, tz="UTC") + lubridate::days(16)),
+                      time.zone = tz,
                       overwrite = FALSE, verbose = FALSE, ...) {
   
   start_date <- as.POSIXct(start_date, tz = "UTC")
@@ -136,7 +137,10 @@ NOAA_GEFS <- function(outfolder, lat.in, lon.in, sitename,
   # convert temp from K to C
   forecasts$Temperature_height_above_ground_ens <- forecasts$Temperature_height_above_ground_ens - 273.15
   
-  # drop hours
+  # change timezone and drop hours
+  if(time.zone != "UTC"){
+    attributes(forecasts$timestamp)$tzone <- time.zone
+  }
   forecasts$timestamp <- format(forecasts$timestamp, format = "%Y-%m-%d")
   
   day.forecast <- forecasts %>% 
