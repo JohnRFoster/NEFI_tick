@@ -23,7 +23,7 @@ convergence_check <- function(jags.out, model,
     cat("Determining burnin\n")
     GBR <- gelman.plot(out$params)
     burnin <- GBR$last.iter[tail(which(apply(GBR$shrink[,,2]>GBR.thresh,1,any)),1)+1]
-    if(is.na(burnin)){
+    if(is.na(burnin) | burnin > 7500){
       cat("Model not converged!\n")
     } else {
       cat("Burnin after:", burnin, "iterations\n")  
@@ -63,7 +63,7 @@ convergence_check <- function(jags.out, model,
     cat("Determining burnin\n")
     GBR <- gelman.plot(out$params)
     burnin <- GBR$last.iter[tail(which(apply(GBR$shrink[,,2]>GBR.thresh,1,any)),1)+1]
-    if(is.na(burnin)){
+    if(is.na(burnin) | burnin > 7500){
       cat("Model not converged!\n")
     } else {
       cat("Burnin after:", burnin, "iterations\n")  
