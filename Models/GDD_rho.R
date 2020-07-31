@@ -47,12 +47,15 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
   data$rho.prec <- 1 / 200^2
   
   # get survival estimates
-  survival <- get_survival(larva.driver = NULL,
+  survival <- get_survival(larva.driver = met.proc,
                            nymph.driver = NULL)
   data$larva.mean <- survival$larva.survival.mean
   data$larva.prec <- survival$larva.survival.prec
   data$nymph.mean <- survival$nymph.survival.mean
   data$nymph.prec <- survival$nymph.survival.prec
+  
+  data$larva.beta.mu <- survival$larva.beta.mean
+  data$larva.beta.prec <- survival$larva.beta.prec
   
   inits <- function() {
     list(
@@ -112,6 +115,7 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
     }
   }
   
+  beta.l ~ dnorm(larva.beta.mu, larva.beta.prec)
 
   ## observation regression priors
   beta.l.obs ~ dnorm(0, 0.001) T(1E-10,)
@@ -129,14 +133,14 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
   }
 
   ## missing process met
-  # for(t in met.mis){
-  #   met[t] ~ dunif(met.range[1], met.range[2])
-  # }
+  for(t in met.mis){
+    met[t] ~ dunif(met.range[1], met.range[2])
+  }
+  
   # for(t in met.mis.diff){
   #   met.diff[t] ~ dunif(met.range.diff[1], met.range.diff[2])
   # }
-
-  logit(phi.11) <- phi.l.mu
+  
   logit(phi.22) <- phi.n.mu
   logit(l2n) <- grow.ln.mu
   logit(n2a) <- grow.na.mu
@@ -147,9 +151,10 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
     theta.21[t] <- ifelse((gdd[t] >= rho.n) && (gdd[t] <= 2500),l2n,0)
     theta.32[t] <- ifelse((gdd[t] <= 1000) || (gdd[t] >= rho.a),n2a,0)
     lambda[t] <- ifelse((gdd[t] >= rho.l) && (gdd[t] <= 2500),repro.mu,0)
+    logit(phi.11[t]) <- phi.l.mu + beta.l*met[t]
   
-    A.day[1,1,t] <- phi.11*(1-theta.21[t])
-    A.day[2,1,t] <- phi.11*theta.21[t]
+    A.day[1,1,t] <- phi.11[t]*(1-theta.21[t])
+    A.day[2,1,t] <- phi.11[t]*theta.21[t]
     A.day[2,2,t] <- phi.22*(1-theta.32[t])
     A.day[3,2,t] <- phi.22*theta.32[t]
     logit(A.day[3,3,t]) <- phi.a.mu
