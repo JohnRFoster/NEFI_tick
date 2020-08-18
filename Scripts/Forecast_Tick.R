@@ -11,14 +11,38 @@
 #   the forecast period.                              #   
 # =================================================== #
 
-library(rjags)
+library(ecoforecastR)
 library(tidyverse)
 library(lubridate)
 library(ncdf4)
 
 source("Functions/gefs_prior_functions.R")
+source("Functions/get_ticks_2006_2018.R")
+source("Models/tickForecastFilter_monthEffectLifeStage.R")
 
 date.pattern <- "\\d{4}-\\d{2}-\\d{2}"
+
+# =================================================== #
+#                  Testing set up                     #
+# =================================================== #
+
+## parameter estimates from last forecast
+load("../FinalOut/A_Correct/RhoModels/RhoAllStart/MonthEffect/Henry/Combined_thinMat_RhoStartMonthEffectLifeStage_HenryControl.RData")
+
+# parameter estimates in data list
+data <- update_data(params.mat, 4:12)
+
+# using 2012 time series to test workflow
+ticks <- get_ticks_2006_2018("Henry Control")
+index.2012 <- which(year(ticks$date) == 2012)
+obs <- ticks$obs[,index.2012]         # 2012 observations
+obs.dates <- ticks$date[index.2012]   # 2012 observation dates
+
+# initial condition
+data$ic <- obs[,1]
+
+# date of first observation
+ic.date <- obs.dates[1]
 
 # =================================================== #
 #                    Observed met                     #
@@ -77,37 +101,12 @@ gefs.needed <- which(met.gefs.dates == forecast.start.day)
 days.2.grab <- files[gefs.needed]
 
 # dir contains the gefs forecasts where each ensemble member is a separate file
-ens.files <- list.files(paste0(dir.gefs, days.2.grab))
-ens.files <- ens.files[grepl(".nc", ens.files)] # want only .nc files
+gefs.forecast.dir <- paste0(dir.gefs, days.2.grab)
 
-# get dimensions
-gefs.ens <- nc_open(paste0(dir.gefs, days.2.grab, "/", ens.files[1])) 
-n.var <- length(gefs.ens$var)
-var.names <- names(gefs.ens$var)
-n.days <- length(ncvar_get(gefs.ens, var.names[1]))
+# read the dir and compile ensembles, return list of data frames, one for each ensemble
+met.gefs <- get_gefs_ens(gefs.forecast.dir)
 
-met.gefs <- list()
-for(ens in 1:21){ # get data for each ensemble member
-  gefs.ens <- nc_open(paste0(dir.gefs, days.2.grab, "/", ens.files[ens])) 
-  gefs.data <- matrix(NA, n.days, n.var)
-  for(v in seq_along(var.names)){
-    gefs.data[,v] <- ncvar_get(gefs.ens, var.names[v])  
-  }
-  colnames(gefs.data) <- var.names
-  
-  gdd <- rep(NA, nrow(gefs.data))
-  for(i in 1:nrow(gefs.data)){
-    gdd[i] <- max(mean(gefs.data[i, "max.temp"], gefs.data[i, "min.temp"]) - base, 0)
-  }
-  
-  gefs.cum.gdd <- cumsum(c(end.cum.gdd, gdd))
-  gefs.data <- gefs.data %>% 
-    as.data.frame() %>% 
-    mutate(cum.gdd = gefs.cum.gdd[-1])
-  
-  met.gefs[[ens]] <- gefs.data
-}
-
+# extract the mean vector and precision matrix for each weather variable
 min.temp <- get_gefs_mean_prec(met.gefs, "min.temp")
 max.temp <- get_gefs_mean_prec(met.gefs, "max.temp")
 min.rh <- get_gefs_mean_prec(met.gefs, "min.rh")
@@ -116,23 +115,7 @@ precip <- get_gefs_mean_prec(met.gefs, "precip")
 vpd <- get_gefs_mean_prec(met.gefs, "vpd")
 cum.gdd <- get_gefs_mean_prec(met.gefs, "cum.gdd")
 
-# =================================================== #
-#                     Testing                         #
-# =================================================== #
 
-## parameter estimates from last forecast
-load("../FinalOut/A_Correct/RhoModels/RhoAllStart/MonthEffect/Henry/Combined_thinMat_RhoStartMonthEffectLifeStage_HenryControl.RData")
-
-data <- update_data(params.mat, 4:12)
-
-## initial conditions
-data$ic <- rpois(3, c(500, 50, 10))
- 
-ticks <- get_ticks_2006_2018(grid)
-
-
-# dates
-ic.date <- last.met.obs.date - 15
 
 met.obs.index <- match(c(ic.date+1, last.met.obs.date), ymd(met.observed.dates))
 met.subset <- met.observed[met.obs.index[1]:met.obs.index[2],]
