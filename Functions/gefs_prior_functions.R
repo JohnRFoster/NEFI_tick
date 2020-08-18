@@ -72,3 +72,44 @@ get_gefs_mean_prec <- function(met.gefs, met.var){
   return(list(mu = mu, prec = prec.mat))
 }
 
+#' This function reads the files for a given gefs forecast and creates a list
+#' each element in the list is a data frame for one ensemble forecast
+#'
+#' @param dir "file/path/to/gefs/ensembles
+
+get_gefs_ens <- function(dir){
+  ens.files <- list.files(dir)
+  ens.files <- ens.files[grepl(".nc", ens.files)] # want only .nc files
+  
+  # get dimensions
+  gefs.ens <- nc_open(paste0(dir.gefs, days.2.grab, "/", ens.files[1])) 
+  n.var <- length(gefs.ens$var)
+  var.names <- names(gefs.ens$var)
+  n.days <- length(ncvar_get(gefs.ens, var.names[1]))
+  
+  met.gefs <- list()
+  for(ens in 1:21){ # get data for each ensemble member
+    gefs.ens <- nc_open(paste0(dir.gefs, days.2.grab, "/", ens.files[ens])) 
+    gefs.data <- matrix(NA, n.days, n.var)
+    for(v in seq_along(var.names)){
+      gefs.data[,v] <- ncvar_get(gefs.ens, var.names[v])  
+    }
+    colnames(gefs.data) <- var.names
+    
+    gdd <- rep(NA, nrow(gefs.data))
+    for(i in 1:nrow(gefs.data)){
+      gdd[i] <- max(mean(gefs.data[i, "max.temp"], gefs.data[i, "min.temp"]) - base, 0)
+    }
+    
+    gefs.cum.gdd <- cumsum(c(end.cum.gdd, gdd))
+    gefs.data <- gefs.data %>% 
+      as.data.frame() %>% 
+      mutate(cum.gdd = gefs.cum.gdd[-1])
+    
+    met.gefs[[ens]] <- gefs.data
+  }
+  return(met.gefs)
+}
+
+
+
