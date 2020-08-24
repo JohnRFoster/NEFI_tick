@@ -131,7 +131,7 @@ run_jagsFilter <- function(data, n.adapt, n.chains,
     "rho.a",
     "alpha.month",
     "gdd.mu",
-    "met.obs.mu",
+    "met.obs.mu"
   )
   
   model = " model {
@@ -261,7 +261,12 @@ run_jagsFilter <- function(data, n.adapt, n.chains,
     n.chains = n.chains
   )
   
-  return <- list(j.model = j.model,
+  jags.out <- coda.samples(model = j.model,
+                           variable.names = monitor,
+                           n.iter = 50000)
+  
+  return <- list(compiled.model = j.model,
+                 jags.out = jags.out,
                  monitor = monitor,
                  start.time = start.time)
   
