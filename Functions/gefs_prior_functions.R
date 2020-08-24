@@ -75,9 +75,10 @@ get_gefs_mean_prec <- function(met.gefs, met.var){
 #' This function reads the files for a given gefs forecast and creates a list
 #' each element in the list is a data frame for one ensemble forecast
 #'
-#' @param dir "file/path/to/gefs/ensembles
+#' @param dir file path to directory ensembles are stored 
+#' @param end.cum.gdd cumulative growing degree days at the end of met observations
 
-get_gefs_ens <- function(dir){
+get_gefs_ens <- function(dir, end.cum.gdd){
   ens.files <- list.files(dir)
   ens.files <- ens.files[grepl(".nc", ens.files)] # want only .nc files
   
