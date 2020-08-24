@@ -46,6 +46,10 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
   data$rho.a.mu <- 2500
   data$rho.prec <- 1 / 200^2
   
+  data$larva.month.prec <- 1 / 500^2
+  data$nymph.month.prec <- 1 / 50^2
+  data$adult.month.prec <- 1 / 25^2
+  
   # get survival estimates
   survival <- get_survival(larva.driver = NULL,
                            nymph.driver = NULL)
@@ -56,7 +60,7 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
   
   # data$nymph.beta.mu <- survival$nymph.beta.mean
   # data$nymph.beta.prec <- survival$nymph.beta.prec
-  
+
   inits <- function() {
     list(
       p = data$y[, -1],
@@ -78,7 +82,7 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
     "phi.l.mu",
     "phi.n.mu",
     "phi.a.mu",
-    "beta.a",
+    # "beta.a",
     "grow.ln.mu",
     "grow.na.mu",
     "repro.mu",
@@ -109,14 +113,12 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
   SIGMA ~ dwish(R, 4)         # mvn [3 x 3] site process
   
   ### random month prior
-  for(s in 1:3){
-    for(month in n.months){
-      alpha.month[s,month] ~ dnorm(0, 0.001)
-    }
+  for(month in n.months){
+    alpha.month[1,month] ~ dnorm(0, larva.month.prec)
+    alpha.month[2,month] ~ dnorm(0, nymph.month.prec)
+    alpha.month[3,month] ~ dnorm(0, adult.month.prec)
   }
   
-  beta.a ~ dnorm(0, 0.01)
-
   ## observation regression priors
   beta.l.obs ~ dnorm(0, 0.001) T(1E-10,)
   theta.nymph ~ dunif(0,1)
@@ -133,9 +135,9 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
   }
 
   ## missing process met
-  for(t in met.mis){
-    met[t] ~ dunif(met.range[1], met.range[2])
-  }
+  # for(t in met.mis){
+  #   met[t] ~ dunif(met.range[1], met.range[2])
+  # }
   
   # for(t in met.mis.diff){
   #   met.diff[t] ~ dunif(met.range.diff[1], met.range.diff[2])
@@ -157,7 +159,7 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
     A.day[2,1,t] <- phi.11*theta.21[t]
     A.day[2,2,t] <- phi.22*(1-theta.32[t])
     A.day[3,2,t] <- phi.22*theta.32[t]
-    logit(A.day[3,3,t]) <- phi.a.mu + beta.a*met[t]
+    logit(A.day[3,3,t]) <- phi.a.mu 
     A.day[1,3,t] <- lambda[t]
     A.day[1,2,t] <- 0
     A.day[2,3,t] <- 0
