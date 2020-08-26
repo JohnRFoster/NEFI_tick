@@ -68,7 +68,7 @@ gefs_prior <- function(days){
 get_gefs_mean_prec <- function(met.gefs, met.var){
   dat <- t(map_dfc(met.gefs, function(x) x %>% as.data.frame() %>% select(all_of(met.var))))
   mu <- apply(dat, 2, mean) # mean vector
-  prec.mat <- solve(cov(dat), tol = 1e-30) # precision matrix
+  prec.mat <- cov(dat) # covariance matrix
   return(list(mu = mu, prec = prec.mat))
 }
 

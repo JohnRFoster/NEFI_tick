@@ -158,8 +158,8 @@ run_jagsFilter <- function(data, n.adapt, n.chains,
   }
   
   ### GEFS
-  cum.gdd.gefs.mu ~ dmnorm(gdd.mu, cum.gdd.gefs.prec)
-  obs.temp.gefs.mu ~ dmnorm(met.obs.mu, obs.temp.gefs.prec)
+  cum.gdd.gefs.mu ~ dmnorm.vcov(gdd.mu, cum.gdd.gefs.prec)
+  obs.temp.gefs.mu ~ dmnorm.vcov(met.obs.mu, obs.temp.gefs.prec)
   
   for(t in 1:n.days.gefs){
     gdd.mu[t] ~ dnorm(cum.gdd.prior[t], 0.0001)
