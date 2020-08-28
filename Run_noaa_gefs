@@ -7,5 +7,5 @@
 #$ -N NOAA_GEFS
 #$ -o ../Output_Files/NOAA/
 # module load netcdf
-module load R
+module load R/3.6.0
 Rscript /projectnb/dietzelab/fosterj/NEFI_tick/Scripts/NOAA_GEFS_site_download.R

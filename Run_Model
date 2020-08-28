@@ -1,32 +1,22 @@
 #! /bin/bash -l
 #$ -j y
 #$ -m ea
-# #$ -l mem_per_core=8G
+#$ -l buyin
 
 ## --- Model Loop --- ##
-# #$ -l buyin
-# #$ -pe omp 1
-# #$ -l h_rt=120:00:00
-# #$ -l mem_per_core=8G
-# #$ -t 1-5
-# #$ -N NULL_tea
-# #$ -o ../Output_Files/K_all/
-# module load R
-# Rscript Scripts/Run_Model_Loop.R
+#$ -l h_rt=120:00:00
+#$ -l mem_per_core=4G
+#$ -t 1-15
+#$ -N MonthDiffPrior
+#$ -o ../Output_Files/K_all/
+module load R/3.6.0
+Rscript Scripts/Run_Model_Loop.R
+
 # Rscript ExploreScripts/restart_model.R
 
-## --- DIC --- ##
-#$ -l buyin
-#$ -l h_rt=120:00:00
-#$ -l mem_per_core=16G
-#$ -t 1-3
-#$ -N DIC_NULL
-#$ -o ../Output_Files/DIC/
-module load R
-Rscript Scripts/DIC_calc.R
+
 
 ## --- Survival --- ##
-# #$ -l buyin
 # #$ -pe omp 1
 # #$ -l h_rt=48:00:00
 # #$ -N survival_nymph
@@ -35,7 +25,6 @@ Rscript Scripts/DIC_calc.R
 # Rscript Models/Cary_Survival.R
 
 ## --- Mark Recapture --- ##
-# #$ -l buyin
 # #$ -pe omp 1
 # #$ -l mem_per_core=16G
 # #$ -l h_rt=120:00:00
@@ -45,25 +34,6 @@ Rscript Scripts/DIC_calc.R
 # module load R
 # Rscript ExploreScripts/restart_model.R
 # Rscript Models/MR_Recruit.R
-
-## --- Particle Filter --- ##
-# #$ -l buyin
-# #$ -pe omp 3
-# #$ -l h_rt=48:00:00
-# #$ -N pf_
-# #$ -o ../Output_Files/ParticleFilter/
-# module load R
-# Rscript ExploreScripts/ParticleFilter_Obs.R
-
-## --- Knit Markdown --- ##
-# #$ -l buyin
-# #$ -pe omp 4
-# #$ -l h_rt=12:00:00
-# #$ -N rh_tea
-# #$ -o ../Output_Files/RMD/
-# module load R
-# module load pandoc/2.5
-# Rscript ExploreScripts/knit_rmd.R
 
 ## --- Testing --- ##
 # #$ -l buyin
