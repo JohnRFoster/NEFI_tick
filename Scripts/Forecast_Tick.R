@@ -15,10 +15,12 @@ library(ecoforecastR)
 library(tidyverse)
 library(lubridate)
 library(ncdf4)
+library(progress)
 
 source("Functions/gefs_prior_functions.R")
 source("Functions/get_ticks_2006_2018.R")
 source("Functions/convergence_check.R")
+source("Functions/scale_met_forecast.R")
 source("Models/tickForecastFilter_monthEffectLifeStage.R")
 
 date.pattern <- "\\d{4}-\\d{2}-\\d{2}"
@@ -26,6 +28,9 @@ date.pattern <- "\\d{4}-\\d{2}-\\d{2}"
 # =================================================== #
 #                  Testing set up                     #
 # =================================================== #
+
+## training met data means
+hist.means <- scale_met_forecast()
 
 ## parameter estimates from last forecast
 top.dir <- "../FinalOut/A_Correct"   # all fitted models start here
@@ -39,7 +44,7 @@ load(file.path(top.dir,
 
 # output directory
 specific.name <- "LifeStageMonthEffect_UpdateAllParameters"
-out.dir <- file.path("../FinalOut/ForecastTestRuns/Cary", 
+out.dir <- file.path("../FinalOut/ForecastTestRuns2020_08_28/Cary", 
                      model.type,
                      specific.name,
                      site.dir.name)
@@ -51,8 +56,9 @@ data <- update_data(params.mat, 4:12)
 ticks <- get_ticks_2006_2018("Henry Control")
 index.2012 <- which(year(ticks$date) == 2012)
 obs <- ticks$obs[,index.2012]   # 2012 observations
-obs <- obs[,2:5]
-data$ic <- rpois(3, 20)         # initial condition, put in data for jags
+y.vec <- obs[,1]
+obs <- obs[,2:5] # remove first set
+data$ic <- rpois(3, y.vec+1)         # initial condition, put in data for jags
 
 # 2012 observation dates, change year to 2020
 obs.dates <- ymd(format(ticks$date[index.2012], "2020-%m-%d"))   
@@ -89,6 +95,7 @@ colnames(met.observed) <- var.names
 last.met.obs.date <- ymd(met.observed.dates[length(met.observed.dates)])
 
 # calculate growing degree days with base 10
+# need to do this before centering other variables to historical means
 base <- 10
 gdd <- rep(NA, nrow(met.observed))
 for(i in 1:nrow(met.observed)){
@@ -99,52 +106,37 @@ for(i in 1:nrow(met.observed)){
 met.observed <- met.observed %>% 
   as.data.frame() %>% 
   mutate(cum.gdd = cumsum(gdd)) %>% 
-  mutate(Date = ymd(met.observed.dates))
-
-# cumulative growing degree days at end of observation period
-# needed for cum.gdd calculations across GEFS 
-end.cum.gdd <- met.observed$cum.gdd[nrow(met.observed)]
-
-# =================================================== #
-#                      NOAA GEFS                      #
-# =================================================== #
+  mutate(Date = ymd(met.observed.dates)) %>% 
+  mutate(TMAX = TMAX - hist.means["MAX_TEMP"]) %>% # center to historical means
+  mutate(TMIN = TMIN - hist.means["MIN_TEMP"])
 
 dir.gefs <- "../GEFS/Cary/"
-files <- list.files(dir.gefs)
+files.gefs <- list.files(dir.gefs)
 
-forecast.start.day <- ic.date + 1
-
-met.gefs.dates <- ymd(str_extract(files, date.pattern))
-
-met.obs.index <- match(c(ic.date+1, last.met.obs.date), ymd(met.observed.dates))
-met.subset <- met.observed[met.obs.index[1]:met.obs.index[2],]
-
-
-
+met.gefs.dates <- ymd(str_extract(files.gefs, date.pattern))
 
 # indexing for known met and gefs
-n.adapt <- 20
+n.adapt <- 5000
 n.chains <- 3
 n.iter <- 50000
-
-
-# jags.mat <- as.matrix(jags.out)
-# met.obs.jags <- jags.mat[,grep("met.obs.mu", colnames(jags.mat), fixed = TRUE)]
-# met.obs.jags.ci <- apply(met.obs.jags, 2, quantile, c(0.025, 0.05, 0.975))
-
-# par(mfrow=c(1,1))
-# plot(dat[1,], type = "l", ylim = c(0,20))
-# for(m in 2:nrow(dat)) lines(dat[m,])
-# for(m in 1:nrow(met.obs.jags.ci)) lines(met.obs.jags.ci[m,], col = "blue")
-
 
 # forecast loop, need to check:
 # 1. if there is a new tick observation
 # 2. the latest observed weather
 every.day <- seq.Date(met.gefs.dates[1]+4, today(), by = 1) # everyday 
 forecast.start.day <- "2020-05-20" # day forecast stems from
-for(t in seq_along(every.day)){
-  current.day <- every.day[t]  # date forecast is made
+
+# progress bar
+pb <- progress::progress_bar$new(
+  format = "  forecast [:bar] :percent eta: :eta",
+  total = length(every.day), 
+  clear = FALSE, width= 60)
+
+for(i in seq_along(every.day)){
+# for(t in 1:35){
+  cat("\n\n===================================================\n\n")
+  pb$tick()
+  current.day <- every.day[i]  # date forecast is made
   
   # usually run three or four days behind
   last.met.obs.date <- current.day - 4 
@@ -154,12 +146,55 @@ for(t in seq_along(every.day)){
   if(current.day %in% posted.days){
     # match and assimilate
     index <- which(current.day == posted.days)
-    data$ic <- obs[,index]
-    forecast.start.day <- obs.dates[1]
+    y.vec <- obs[,index] # update 
     
+    # new date forecast stems from
+    new.start.day <- obs.dates[index]
+    
+    cat("New tick observation on", as.character(obs.dates[index]), "\n")
+    cat("Posted on", as.character(posted.days[index]), "\n")
+    
+    # grab forecast; all files written
+    files.forecast <- list.files(out.dir) 
+    
+    # the files that stem from previous forecast.start.day
+    forecast.group <- grep(forecast.start.day, files.forecast) 
+    files.forecast <- files.forecast[forecast.group] # subset
+    assim.file <- files.forecast[length(files.forecast)]
+    
+    load(file.path(out.dir, assim.file))
+    
+    # update posteriors 
+    data <- update_data(parameters, 1:12) 
+    
+    # pull out median predictions
+    forecast.med <- round(apply(preds, 2, median))
+    l.seq <- seq(1, by = 3, length.out = ncol(preds)/3) # larva columns
+    
+    larva <- forecast.med[l.seq]
+    nymph <- forecast.med[l.seq+1] # add 1 for nymph columns
+    adult <- forecast.med[l.seq+2] # add 2 for adult columns
+    
+    # find day that we need
+    median.index <- which(date.fore == new.start.day)
+    
+    # initial condition is median of forecast
+    data$ic <- c(larva[median.index], nymph[median.index], adult[median.index])
+    
+    # set forecast.start.day
+    forecast.start.day <- new.start.day
     
   } 
 
+  # subset observed met
+  build.obs.met <- met.observed %>% 
+    filter(Date <= last.met.obs.date) %>% 
+    filter(Date >= forecast.start.day)
+  
+  # cumulative growing degree days at end of observation period
+  # needed for cum.gdd calculations across GEFS 
+  end.cum.gdd <- build.obs.met$cum.gdd[nrow(build.obs.met)]
+  
   # grab GEFS
   gefs.needed <- match(ymd(last.met.obs.date)+1, met.gefs.dates)
   
@@ -172,7 +207,7 @@ for(t in seq_along(every.day)){
     gefs.needed <- which(lag.days == min(lag.days[lag.days >= 0], na.rm = TRUE))
     gefs.diff <- as.numeric(difftime(ymd(last.met.obs.date)+1, met.gefs.dates[gefs.needed]))
   }
-  days.2.grab <- files[gefs.needed] # gefs date we need
+  days.2.grab <- files.gefs[gefs.needed] # gefs date we need
   
   # dir contains the gefs forecasts where each ensemble member is a separate file
   gefs.forecast.dir <- paste0(dir.gefs, days.2.grab)
@@ -189,33 +224,54 @@ for(t in seq_along(every.day)){
   }
   
   # extract the mean vector and precision matrix for each weather variable
-  min.temp <- get_gefs_mean_prec(met.gefs, "min.temp")
-  cum.gdd <- get_gefs_mean_prec(met.gefs, "cum.gdd")
+  cum.gdd <- get_gefs_mean_prec(met.gefs, "cum.gdd") 
+  min.temp <- get_gefs_mean_prec(met.gefs, "min.temp", hist.means["MIN_TEMP"])
   
-  # subset observed met
-  build.obs.met <- met.observed %>% 
-    filter(Date <= last.met.obs.date) %>% 
-    filter(Date >= forecast.start.day)
-  
-  data$cum.gdd <- pull(build.obs.met, cum.gdd)
-  data$obs.temp <- pull(build.obs.met, TMIN)
-  data$n.days <- nrow(build.obs.met) + length(cum.gdd$mu)
-  data$seq.days <- (data$n.days - 1):1
-  data$cum.gdd.gefs.mu <- cum.gdd$mu
-  data$cum.gdd.gefs.prec <- cum.gdd$prec
-  data$obs.temp.gefs.mu <- min.temp$mu
-  data$obs.temp.gefs.prec <- min.temp$prec
-  data$n.days.gefs <- length(cum.gdd$mu)
+  # total days in forecast
+  data$n.days <- nrow(build.obs.met) + length(min.temp$mu)
   
   # need the month of all days in the sequence
   all.days <- seq.Date(ymd(forecast.start.day), length.out = data$n.days, by = 1)
   data$month.index <- month(all.days)
   
+  # control flow for cumulative gdd priors if we drop 1st cum.gdd forecast
+  if(!is.null(cum.gdd$add.2.obs)){
+    data$cum.gdd <- c(pull(build.obs.met, cum.gdd), cum.gdd$add.2.obs)
+    
+    # need day of year for gefs prior
+    doys <- yday(all.days[-(1:(nrow(build.obs.met)+1))])
+    gefs.priors <- gefs_prior(doys)
+    data$cum.gdd.prior <- pull(gefs.priors, cum.gdd)
+  } else {
+    data$cum.gdd <- pull(build.obs.met, cum.gdd)  
+    
+    # need day of year for gefs prior
+    doys <- yday(all.days[-(1:nrow(build.obs.met))])
+    gefs.priors <- gefs_prior(doys)
+    data$cum.gdd.prior <- pull(gefs.priors, cum.gdd)
+  }
+  
   # need day of year for gefs
   doys <- yday(all.days[-(1:nrow(build.obs.met))])
   gefs.priors <- gefs_prior(doys)
-  data$cum.gdd.prior <- pull(gefs.priors, cum.gdd)
   data$obs.temp.prior <- pull(gefs.priors, min.temp)
+  
+  # number of days in each ensemble variable forecast
+  data$n.gefs.gdd <- length(cum.gdd$mu)
+  data$n.gefs.min.temp <- length(min.temp$mu)
+  
+  data$obs.temp <- pull(build.obs.met, TMIN)
+  
+  data$seq.days <- (data$n.days - 1):1
+  data$cum.gdd.gefs.mu <- cum.gdd$mu
+  data$cum.gdd.gefs.prec <- cum.gdd$prec
+  data$obs.temp.gefs.mu <- min.temp$mu
+  data$obs.temp.gefs.prec <- min.temp$prec
+  
+  # build y matrix
+  y <- matrix(NA, 3, data$n.days)
+  y[,1] <- y.vec # does not change unless we assimilate
+  data$y <- y
   
   cat("Forecast initial conditions and start day:", as.character(forecast.start.day), "\n")
   cat("Forecast is being run on:", as.character(current.day), "\n")
@@ -226,23 +282,33 @@ for(t in seq_along(every.day)){
   mcmc.model <- run_jagsFilter(data, n.adapt, n.chains, n.iter)
   
   # check convergence
-  out <- convergence_check(mcmc.model$jags.out, mcmc.model$compiled.model)
-  
-  # update posteriors 
+  out <- convergence_check(mcmc.model$jags.out,
+                           mcmc.model$compiled.model,
+                           mcmc.model$monitor,
+                           n.iter/2,
+                           FALSE) # print
   parameters <- as.matrix(out$params)
   preds <- as.matrix(out$predict)
-  data <- update_data(parameters, 1:12) 
   
   # thin for saving
-  thin <- seq(1, nrow(parameters), length.out = 10000)
+  thin <- seq(1, nrow(parameters), length.out = 5000)
   preds <- preds[thin,]
   parameters <- parameters[thin,]
   
   # save as .RData
-  outname <- paste(current.day, "Tick_forecast_jagsFilter.RData", sep = "_") # name file
-  save(preds, parameters, data,
+  outname <- paste(forecast.start.day, current.day, "Tick_forecast_jagsFilter.RData", sep = "_") # name file
+  
+  # check and create dir
+  if(!dir.exists(out.dir)) dir.create(out.dir, recursive = TRUE)
+  
+  forecast.seq.dates <- seq.Date(ymd(forecast.start.day), 
+                                 by = 1, 
+                                 length.out = data$n.days)
+  date.fore <- as.character(forecast.seq.dates)
+  save(preds, parameters, data, date.fore,
        file = file.path(out.dir, outname))
   
+  ## save forecasts within specific folders for each forecast date? or same directory?
 }
 
 
