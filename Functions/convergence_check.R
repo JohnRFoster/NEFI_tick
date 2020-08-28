@@ -1,6 +1,6 @@
-
-convergence_check <- function(jags.out, model, 
-                       n.iter = 10000, min.eff.size = 5000, GBR.thresh = 1.02){
+library(runjags)
+convergence_check <- function(jags.out, model, monitor, n.iter, print = FALSE,
+                       min.eff.size = 4000, GBR.thresh = 1.1){
   
   enough.samples <- converge <- FALSE
   
@@ -12,10 +12,13 @@ convergence_check <- function(jags.out, model,
   out$predict <- ecoforecastR::mat2mcmc.list(mfit[, c(chain.col, pred.cols)])
   out$params <- ecoforecastR::mat2mcmc.list(mfit[, -pred.cols])
   
+  params.summary <- summary(out$params)
+  iterations <- params.summary$end
+  
   # convergence check on parameters
   cat("Calculating PSRF\n")
   GBR.vals <- gelman.diag(out$params, multivariate = FALSE)
-  GBR.vals
+  if(print) print(GBR.vals)
   converge <- max(GBR.vals$psrf) < GBR.thresh
   cat("Convergence:", converge, "\n")
   
@@ -23,7 +26,7 @@ convergence_check <- function(jags.out, model,
     cat("Determining burnin\n")
     GBR <- gelman.plot(out$params)
     burnin <- GBR$last.iter[tail(which(apply(GBR$shrink[,,2]>GBR.thresh,1,any)),1)+1]
-    if(is.na(burnin) | burnin > 7500){
+    if(is.na(burnin) | burnin > iterations*0.75){
       cat("Model not converged!\n")
     } else {
       cat("Burnin after:", burnin, "iterations\n")  
@@ -35,13 +38,16 @@ convergence_check <- function(jags.out, model,
   }
   
   counter <- 1
-  while(!converge & !enough.samples){
+  while(!converge | !enough.samples){
     counter <- counter + 1
+    if(counter > 4) print <- TRUE
     cat("coda.samples call number:", counter, "\n")
-    jags.out <- coda.samples(model = model$j.model,
-                             variable.names = model$monitor,
-                             n.iter = 10000)
+    new.out <- coda.samples(model = model,
+                             variable.names = monitor,
+                             n.iter = n.iter)
     
+    jags.out <- combine.mcmc(mcmc.objects = list(jags.out, new.out), 
+                             collapse.chains = FALSE)
     cat("coda samples done, checking mcmc \n")
     
     ## split output
@@ -52,10 +58,13 @@ convergence_check <- function(jags.out, model,
     out$predict <- ecoforecastR::mat2mcmc.list(mfit[, c(chain.col, pred.cols)])
     out$params <- ecoforecastR::mat2mcmc.list(mfit[, -pred.cols])
     
+    params.summary <- summary(out$params)
+    iterations <- params.summary$end
+    
     # convergence check on parameters
     cat("Calculating PSRF\n")
     GBR.vals <- gelman.diag(out$params, multivariate = FALSE)
-    GBR.vals
+    if(print) print(GBR.vals)
     converge <- max(GBR.vals$psrf) < GBR.thresh
     cat("Convergence:", converge, "\n")
     if(!converge) next
@@ -63,7 +72,7 @@ convergence_check <- function(jags.out, model,
     cat("Determining burnin\n")
     GBR <- gelman.plot(out$params)
     burnin <- GBR$last.iter[tail(which(apply(GBR$shrink[,,2]>GBR.thresh,1,any)),1)+1]
-    if(is.na(burnin) | burnin > 7500){
+    if(is.na(burnin) | burnin > n.iter*0.75){
       cat("Model not converged!\n")
     } else {
       cat("Burnin after:", burnin, "iterations\n")  
