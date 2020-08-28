@@ -191,7 +191,7 @@ run_jagsFilter <- function(data, n.adapt, n.chains,
   for(t in 1:(n.days)){
   
     # expected number questing
-    Ex[1:3,t] <- TRANS[1:3,1:3,seq.days[t]] %*% x[1:3,t] + alpha.month[1:3, month.index[t]]
+    Ex[1:3,t] <- TRANS[1:3,1:3,t] %*% x[1:3,t] + alpha.month[1:3, month.index[t]]
   
     # process error
     p[1:3,t] ~ dmnorm(Ex[1:3,t], SIGMA)
