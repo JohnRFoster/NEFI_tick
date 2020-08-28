@@ -65,11 +65,22 @@ gefs_prior <- function(days){
 #' @param met.gefs list gefs ensemble, each list element is a data frame with met variables as columns
 #' @param met.var met variable to extract, must match column names in met.gefs
 
-get_gefs_mean_prec <- function(met.gefs, met.var){
+get_gefs_mean_prec <- function(met.gefs, met.var, scale = 0){
+  add.2.obs <- NULL
   dat <- t(map_dfc(met.gefs, function(x) x %>% as.data.frame() %>% select(all_of(met.var))))
+  if(met.var == "cum.gdd"){
+    var.check <- apply(dat, 2, var)
+    if(var.check[1] == 0){
+      dat <- dat[,-1]
+      add.2.obs <- dat[1,1] # only change when assessing cum.gdd and var = 0
+    } 
+  } else {
+    dat <- dat - scale
+  }
+  
   mu <- apply(dat, 2, mean) # mean vector
-  prec.mat <- cov(dat) # covariance matrix
-  return(list(mu = mu, prec = prec.mat))
+  prec.mat <- solve(cov(dat)) # precision matrix
+  return(list(mu = mu, prec = prec.mat, add.2.obs = add.2.obs))
 }
 
 #' This function reads the files for a given gefs forecast and creates a list
@@ -83,14 +94,14 @@ get_gefs_ens <- function(dir, end.cum.gdd){
   ens.files <- ens.files[grepl(".nc", ens.files)] # want only .nc files
   
   # get dimensions
-  gefs.ens <- nc_open(paste0(dir.gefs, days.2.grab, "/", ens.files[1])) 
+  gefs.ens <- nc_open(paste0(dir, "/", ens.files[1])) 
   n.var <- length(gefs.ens$var)
   var.names <- names(gefs.ens$var)
   n.days <- length(ncvar_get(gefs.ens, var.names[1]))
   
   met.gefs <- list()
   for(ens in 1:21){ # get data for each ensemble member
-    gefs.ens <- nc_open(paste0(dir.gefs, days.2.grab, "/", ens.files[ens])) 
+    gefs.ens <- nc_open(paste0(dir, "/", ens.files[ens])) 
     gefs.data <- matrix(NA, n.days, n.var)
     for(v in seq_along(var.names)){
       gefs.data[,v] <- ncvar_get(gefs.ens, var.names[v])  
