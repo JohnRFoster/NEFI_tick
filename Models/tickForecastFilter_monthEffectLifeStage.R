@@ -96,7 +96,7 @@ update_data <- function(params.mat, month.seq, known.vals = NULL){
 #'@param thin thinning interval
 #'@param n.iter number of iterations post burnin
 
-run_jagsFilter <- function(data, n.adapt, n.chains,
+run_jagsFilter <- function(data, n.adapt, n.chains, n.iter,
                            known.vals = NULL) {
   
   
@@ -110,7 +110,9 @@ run_jagsFilter <- function(data, n.adapt, n.chains,
       rho.l = max(0, rnorm(1, data$rho.l.mu, 100)),
       rho.n = max(0, rnorm(1, data$rho.n.mu, 100)),
       grow.ln.mu = min(0, rnorm(1, data$l2n.mu, 1)),
-      grow.na.mu = min(0, rnorm(1, data$n2a.mu, 1))
+      grow.na.mu = min(0, rnorm(1, data$n2a.mu, 1)),
+      gdd.mu = rnorm(data$n.gefs.gdd, data$cum.gdd.gefs.mu, 1),
+      met.obs.mu = rnorm(data$n.gefs.min.temp, data$obs.temp.gefs.mu, 1)
     )
   }
   
@@ -158,11 +160,13 @@ run_jagsFilter <- function(data, n.adapt, n.chains,
   }
   
   ### GEFS
-  cum.gdd.gefs.mu ~ dmnorm.vcov(gdd.mu, cum.gdd.gefs.prec)
-  obs.temp.gefs.mu ~ dmnorm.vcov(met.obs.mu, obs.temp.gefs.prec)
+  cum.gdd.gefs.mu ~ dmnorm(gdd.mu, cum.gdd.gefs.prec)
+  obs.temp.gefs.mu ~ dmnorm(met.obs.mu, obs.temp.gefs.prec)
   
-  for(t in 1:n.days.gefs){
+  for(t in 1:n.gefs.gdd){
     gdd.mu[t] ~ dnorm(cum.gdd.prior[t], 0.0001)
+  }
+  for(t in 1:n.gefs.min.temp){
     met.obs.mu[t] ~ dnorm(obs.temp.prior[t], 0.001)
   }
   
@@ -263,7 +267,7 @@ run_jagsFilter <- function(data, n.adapt, n.chains,
   
   jags.out <- coda.samples(model = j.model,
                            variable.names = monitor,
-                           n.iter = 50000)
+                           n.iter = n.iter)
   
   return <- list(compiled.model = j.model,
                  jags.out = jags.out,
