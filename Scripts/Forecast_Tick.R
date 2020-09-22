@@ -15,12 +15,12 @@ library(ecoforecastR)
 library(tidyverse)
 library(lubridate)
 library(ncdf4)
-library(progress)
 
 source("Functions/gefs_prior_functions.R")
 source("Functions/get_ticks_2006_2018.R")
 source("Functions/convergence_check.R")
 source("Functions/scale_met_forecast.R")
+source("Functions/create_ncdf_tick.R")
 source("Models/tickForecastFilter_monthEffectLifeStage.R")
 
 date.pattern <- "\\d{4}-\\d{2}-\\d{2}"
@@ -29,25 +29,38 @@ date.pattern <- "\\d{4}-\\d{2}-\\d{2}"
 #                  Testing set up                     #
 # =================================================== #
 
+site.vec <- c("Green Control", "Henry Control", "Tea Control")
+
+## read array job number and subset site
+# array.num <- as.numeric(Sys.getenv("SGE_TASK_ID"))
+array.num <- 2 # for testing
+site.name <- site.vec[array.num]
+
+cat("Running forecast on", site.name, "\n")
+
 ## training met data means
 hist.means <- scale_met_forecast()
 
-## parameter estimates from last forecast
+## parameter estimates from historical fit
 top.dir <- "../FinalOut/A_Correct"   # all fitted models start here
 model.type <- "RhoModels/RhoAllStart/MonthEffect" # path to specific model 
-site.dir.name <- "Henry" # site
+site.dir.name <- gsub(" Control", "", site.name) # site directory name
 rdata.name <- "Combined_thinMat_RhoStartMonthEffectLifeStage_HenryControl.RData" 
 load(file.path(top.dir,
                model.type,
                site.dir.name,
                rdata.name))
 
-# output directory
+# forecast output directory
 specific.name <- "LifeStageMonthEffect_UpdateAllParameters"
-out.dir <- file.path("../FinalOut/ForecastTestRuns2020_08_28/Cary", 
+today.dir <- paste0("Submit_", today())
+out.dir <- file.path("../FinalOut/ForecastTestRuns", today.dir, "Cary", 
                      model.type,
                      specific.name,
                      site.dir.name)
+
+# check and create dir
+if(!dir.exists(out.dir)) dir.create(out.dir, recursive = TRUE)
 
 # parameter estimates in data list, only Apr:Dec fitted during training
 data <- update_data(params.mat, 4:12) 
@@ -117,8 +130,8 @@ met.gefs.dates <- ymd(str_extract(files.gefs, date.pattern))
 
 # indexing for known met and gefs
 n.adapt <- 5000
-n.chains <- 3
-n.iter <- 50000
+n.chains <- 5
+n.iter <- 100000
 
 # forecast loop, need to check:
 # 1. if there is a new tick observation
@@ -126,16 +139,13 @@ n.iter <- 50000
 every.day <- seq.Date(met.gefs.dates[1]+4, today(), by = 1) # everyday 
 forecast.start.day <- "2020-05-20" # day forecast stems from
 
-# progress bar
-pb <- progress::progress_bar$new(
-  format = "  forecast [:bar] :percent eta: :eta",
-  total = length(every.day), 
-  clear = FALSE, width= 60)
-
 for(i in seq_along(every.day)){
-# for(t in 1:35){
+# i=1
   cat("\n\n===================================================\n\n")
-  pb$tick()
+  
+  per <- i / length(every.day) * 100
+  cat(round(per), "percent completed\n")
+  
   current.day <- every.day[i]  # date forecast is made
   
   # usually run three or four days behind
@@ -260,9 +270,8 @@ for(i in seq_along(every.day)){
   data$n.gefs.gdd <- length(cum.gdd$mu)
   data$n.gefs.min.temp <- length(min.temp$mu)
   
+  # build rest of data needed for jags
   data$obs.temp <- pull(build.obs.met, TMIN)
-  
-  data$seq.days <- (data$n.days - 1):1
   data$cum.gdd.gefs.mu <- cum.gdd$mu
   data$cum.gdd.gefs.prec <- cum.gdd$prec
   data$obs.temp.gefs.mu <- min.temp$mu
@@ -282,31 +291,32 @@ for(i in seq_along(every.day)){
   mcmc.model <- run_jagsFilter(data, n.adapt, n.chains, n.iter)
   
   # check convergence
-  out <- convergence_check(mcmc.model$jags.out,
-                           mcmc.model$compiled.model,
-                           mcmc.model$monitor,
-                           n.iter/2,
-                           FALSE) # print
-  parameters <- as.matrix(out$params)
+  out <- convergence_check(jags.out = mcmc.model$jags.out,
+                           model = mcmc.model$compiled.model,
+                           monitor = mcmc.model$monitor,
+                           n.iter = n.iter/2,
+                           min.eff.size = 2000)
+  
+  # extract parameters and predicted states
+  params <- as.matrix(out$params)
   preds <- as.matrix(out$predict)
   
-  # thin for saving
-  thin <- seq(1, nrow(parameters), length.out = 5000)
-  preds <- preds[thin,]
-  parameters <- parameters[thin,]
-  
   # save as .RData
-  outname <- paste(forecast.start.day, current.day, "Tick_forecast_jagsFilter.RData", sep = "_") # name file
+  outname <- paste(forecast.start.day, current.day, "Tick_forecast_jagsFilter.nc", sep = "_") # name file
+  ncfname <- file.path(out.dir, outname)
   
-  # check and create dir
-  if(!dir.exists(out.dir)) dir.create(out.dir, recursive = TRUE)
+  # vector for what days tick data is assimilated (will need updating)
+  data.assimilation <- as.numeric(complete.cases(t(data$y)))
   
-  forecast.seq.dates <- seq.Date(ymd(forecast.start.day), 
-                                 by = 1, 
-                                 length.out = data$n.days)
-  date.fore <- as.character(forecast.seq.dates)
-  save(preds, parameters, data, date.fore,
-       file = file.path(out.dir, outname))
+  # write netcdf 
+  create_ncdf_tick(ncfname = ncfname,
+                   preds = preds,
+                   params = params,
+                   start.date = forecast.start.day,
+                   data.assimilation = data.assimilation)
+  
+  save(preds, params, ncfname,
+       file = file.path(out.dir, "test.params.RData"))
   
   ## save forecasts within specific folders for each forecast date? or same directory?
 }
