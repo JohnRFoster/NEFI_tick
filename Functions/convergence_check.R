@@ -1,6 +1,6 @@
 library(runjags)
 convergence_check <- function(jags.out, model, monitor, n.iter, print = FALSE,
-                       min.eff.size = 4000, GBR.thresh = 1.1){
+                       min.eff.size = 3000, GBR.thresh = 1.1){
   
   enough.samples <- converge <- FALSE
   
@@ -37,17 +37,26 @@ convergence_check <- function(jags.out, model, monitor, n.iter, print = FALSE,
     }
   }
   
-  counter <- 1
+  counter <- thin <- 1
   while(!converge | !enough.samples){
     counter <- counter + 1
-    if(counter > 4) print <- TRUE
     cat("coda.samples call number:", counter, "\n")
-    new.out <- coda.samples(model = model,
-                             variable.names = monitor,
-                             n.iter = n.iter)
     
-    jags.out <- combine.mcmc(mcmc.objects = list(jags.out, new.out), 
+    if(counter %% 10 == 0) { # print every 10 iterations through
+      print <- TRUE
+      thin <- counter*10 # thinning always increases
+    } else {
+      print <- FALSE
+    }
+    
+    new.out <- coda.samples(model = model,
+                            variable.names = monitor,
+                            n.iter = n.iter,
+                            thin = thin)
+    jags.out <- combine.mcmc(mcmc.objects = list(jags.out, new.out),
                              collapse.chains = FALSE)
+    
+     
     cat("coda samples done, checking mcmc \n")
     
     ## split output
@@ -57,9 +66,6 @@ convergence_check <- function(jags.out, model, monitor, n.iter, print = FALSE,
     chain.col <- which(colnames(mfit) == "CHAIN")
     out$predict <- ecoforecastR::mat2mcmc.list(mfit[, c(chain.col, pred.cols)])
     out$params <- ecoforecastR::mat2mcmc.list(mfit[, -pred.cols])
-    
-    params.summary <- summary(out$params)
-    iterations <- params.summary$end
     
     # convergence check on parameters
     cat("Calculating PSRF\n")
@@ -72,14 +78,18 @@ convergence_check <- function(jags.out, model, monitor, n.iter, print = FALSE,
     cat("Determining burnin\n")
     GBR <- gelman.plot(out$params)
     burnin <- GBR$last.iter[tail(which(apply(GBR$shrink[,,2]>GBR.thresh,1,any)),1)+1]
-    if(is.na(burnin) | burnin > n.iter*0.75){
+    if(is.na(burnin)){
       cat("Model not converged!\n")
     } else {
       cat("Burnin after:", burnin, "iterations\n")  
       out$params <- window(out$params, start = burnin)
       out$predict <- window(out$predict, start = burnin)
-      enough.samples <- min(effectiveSize(out$params)) >= min.eff.size
+      effect.size <- effectiveSize(out$params)
+      enough.samples <- min(effect.size) >= min.eff.size
       cat("Enough samples:", enough.samples, "\n")
+      # if(!enough.samples & print) print(min(effect.size))
+      min.index <- which(effect.size == min(effect.size))
+      print(effect.size[min.index])
     }
   }
   return(out)
