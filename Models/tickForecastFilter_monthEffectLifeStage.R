@@ -208,10 +208,10 @@ run_jagsFilter <- function(data, n.adapt, n.chains, n.iter,
   }
   
   ### aggregate daily matrix between sampling events
-  TRANS[1:3,1:3,n.days] <- A.day[,,n.days] %*% A.day[,,n.days-1]
+  TRANS[1:3,1:3,1] <- A.day[,,1]
   
-  for(day in seq.days){
-    TRANS[1:3,1:3,day] <- TRANS[1:3,1:3,day+1] %*% A.day[,,day]
+  for(day in 2:n.days){
+    TRANS[1:3,1:3,day] <- A.day[,,day] %*% TRANS[1:3,1:3,day-1]
   }
   
   ### Process Model
