@@ -1,79 +1,68 @@
-# need to set this for CRON, will default to geo home instead of projectnb
+# # need to set this for CRON, will default to geo home instead of projectnb
 setwd("/projectnb/dietzelab/fosterj/NEFI_tick")
 
-library(rnoaa)
-library(ncdf4)
+# devtools::install_github("rqthomas/noaaGEFSpoint")
+library(noaaGEFSpoint)
+library(tidyverse)
 library(lubridate)
-library(plantecophys)
-library(tidyr)
-library(dplyr)
-library(PEcAn.logger)
-library(PEcAn.remote)
+library(parallel)
 
-source("Functions/NOAA_GEFS.R")
+print(sessionInfo())
+
+cat("GEFS Specifications:\n")
+
+
+output.directory <- "../Data/cronGEFS"
+cat("Output directory", output.directory, "\n")
+
+site_file <- system.file("extdata", "noaa_download_site_list.csv", package = "noaaGEFSpoint")
+neon_sites <- read.csv(site_file) # read site file .csv
+colnames(neon_sites)[1] <- "site_name" # rename
+cary.info <- data.frame(site_name = "Cary Institute", # add Cary to neon_sites df
+                        site_id = "CARY",
+                        latitude = 41.7851,
+                        longitude = -73.7338)
+neon_sites <- bind_rows(neon_sites, cary.info)
+
+# subset to tick (Ixodes and Amblyomma) prominent sites 
+neon_sites <- neon_sites %>% 
+  filter(site_id %in% c("HARV", "CARY", "BLAN", "ORNL", "SCBI", 
+                        "SERC", "KONZ", "OSBS", "TALL", "UKFS"))
+cat(nrow(neon_sites), "sites:", neon_sites$site_id, "\n")
+
+# set up parallel, default is false
+n.cores <- 6 # for testing
+# n.cores <- as.numeric(Sys.getenv("NSLOTS")) # read number of parallel slots (cores) set in bash script
+cat("Number of cores for download:", n.cores, "\n")
+
+run.par <- FALSE
+if(n.cores > 1) run.par <- TRUE
+cat("Running in parallel:", run.par, "\n")
+
+# method for download, default is point
+method <- "point"
+if(nrow(neon_sites) > 3 | run.par) method <- "grid"
+cat("Download method:", method, "\n")
+
 overwrite <- FALSE
+downscale <- FALSE
+forecast.time <- "all"
+forecast.date <- as.character(lubridate::today())
 
-cat("Start time:", format(Sys.time(), "%Y-%m-%d %H:%M"), "\n")
+cat("Downscale:", downscale, "\n")
+cat("Overwrite:", overwrite, "\n")
+cat("Forecast date:", forecast.date, "\n")
 
-today <- Sys.Date()
+noaaGEFSpoint::noaa_gefs_download_downscale(site_list = neon_sites$site_id, 
+                                            lat_list = neon_sites$latitude, 
+                                            lon_list = neon_sites$longitude, 
+                                            output_directory = output.directory, 
+                                            forecast_time = forecast.time,
+                                            forecast_date = forecast.date,
+                                            downscale = downscale, 
+                                            run_parallel = run.par, 
+                                            num_cores = n.cores, 
+                                            method = method,
+                                            overwrite = overwrite)
 
-# define sitenames
-sitename <- c(
-  "HarvardForest",
-  "CaryInstitute"
-)
-
-# site level storage
-outfolder <- c(
-  "../GEFS/HarvardForest",
-  "../GEFS/Cary"
-)
-
-# latitude for each site
-lat.in <- c(
-  42.5369,     # Harvard Forest
-  41.7851      # Cary Institute 
-)
-
-# longitude for each site
-lon.in <- c(
-  -72.17266,   # Harvard Forest
-  -73.7338     # Cary Institute
-)
-
-# timezone for each site
-tz <- c(
-  "America/New_York",  # Harvard Forest
-  "America/New_York"   # Cary Institute
-)
-
-# download GEFS for each site and save results
-for(site in seq_along(sitename)){
-  
-  # don't need to run if already downloaded
-  check.folder <- paste("NOAA_GEFS", sitename[site], today, sep = ".")
-  check <- file.path(outfolder[site], check.folder)
-  if(dir.exists(check) & !overwrite){
-    cat(sitename[site], "already downloaded!\n")
-    next
-  }
-  
-  # get GEFS
-  cat("===== Attempting", sitename[site], "download =====\n")
-  results <- NOAA_GEFS(
-    outfolder[site],
-    lat.in[site],
-    lon.in[site],
-    sitename[site],
-    time.zone = tz[site],
-  )
-  
-  save(results, 
-       file = paste0(outfolder[site], "/results.RData"))
-  
-  cat("=====", sitename[site], "downloaded =====\n")
-  
-}
-
-cat("\n ----- END ----- \n\n")
-
+print(warnings())
