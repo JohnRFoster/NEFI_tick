@@ -2,13 +2,14 @@
 setwd("/projectnb/dietzelab/fosterj/NEFI_tick")
 
 # devtools::install_github("rqthomas/noaaGEFSpoint")
+library(rNOMADS)
 library(noaaGEFSpoint)
 library(tidyverse)
 library(lubridate)
 library(parallel)
 
 print(sessionInfo())
-
+cat("\n\n")
 cat("GEFS Specifications:\n")
 
 
@@ -47,10 +48,11 @@ cat("Download method:", method, "\n")
 overwrite <- FALSE
 downscale <- FALSE
 forecast.time <- "all"
-forecast.date <- as.character(lubridate::today())
+forecast.date <- "latest"
 
 cat("Downscale:", downscale, "\n")
 cat("Overwrite:", overwrite, "\n")
+cat("Forecast time:", forecast.time, "\n")
 cat("Forecast date:", forecast.date, "\n")
 
 noaaGEFSpoint::noaa_gefs_download_downscale(site_list = neon_sites$site_id, 
