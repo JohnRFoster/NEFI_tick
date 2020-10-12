@@ -3,6 +3,8 @@ setwd("/projectnb/dietzelab/fosterj/NEFI_tick")
 
 # devtools::install_github("rqthomas/noaaGEFSpoint")
 library(rNOMADS)
+Sys.setenv(PATH = "/projectnb/dietzelab/fosterj/grib2/wgrib2/")
+
 library(noaaGEFSpoint)
 library(tidyverse)
 library(lubridate)
@@ -13,7 +15,7 @@ cat("\n\n")
 cat("GEFS Specifications:\n")
 
 
-output.directory <- "../Data/cronGEFS"
+output.directory <- "/projectnb/dietzelab/fosterj/Data"
 cat("Output directory", output.directory, "\n")
 
 site_file <- system.file("extdata", "noaa_download_site_list.csv", package = "noaaGEFSpoint")
@@ -42,7 +44,7 @@ cat("Running in parallel:", run.par, "\n")
 
 # method for download, default is point
 method <- "point"
-if(nrow(neon_sites) > 3 | run.par) method <- "grid"
+# if(nrow(neon_sites) > 3 | run.par) method <- "grid"
 cat("Download method:", method, "\n")
 
 overwrite <- FALSE
@@ -55,16 +57,31 @@ cat("Overwrite:", overwrite, "\n")
 cat("Forecast time:", forecast.time, "\n")
 cat("Forecast date:", forecast.date, "\n")
 
+
+cat("Running noaa_gefs_download_downscale() with method = point\n")
 noaaGEFSpoint::noaa_gefs_download_downscale(site_list = neon_sites$site_id, 
                                             lat_list = neon_sites$latitude, 
                                             lon_list = neon_sites$longitude, 
-                                            output_directory = output.directory, 
+                                            output_directory = file.path(output.directory, "GEFSpoint"),
                                             forecast_time = forecast.time,
                                             forecast_date = forecast.date,
                                             downscale = downscale, 
                                             run_parallel = run.par, 
                                             num_cores = n.cores, 
-                                            method = method,
+                                            method = "point",
+                                            overwrite = overwrite)
+
+cat("Running noaa_gefs_download_downscale() with method = grid\n")
+noaaGEFSpoint::noaa_gefs_download_downscale(site_list = neon_sites$site_id, 
+                                            lat_list = neon_sites$latitude, 
+                                            lon_list = neon_sites$longitude, 
+                                            output_directory = file.path(output.directory, "GEFSgrid"), 
+                                            forecast_time = forecast.time,
+                                            forecast_date = forecast.date,
+                                            downscale = downscale, 
+                                            run_parallel = run.par, 
+                                            num_cores = n.cores, 
+                                            method = "grid",
                                             overwrite = overwrite)
 
 print(warnings())
