@@ -20,7 +20,6 @@
 
 source("Functions/cary_tick_met_JAGS.R") # get data
 source("Functions/site_data_met.R") # subset data for independent fits
-source("Functions/RunMCMC_Model.R") # run mcmc and check for convergence / burnin
 source("Functions/get_survival.R") # run mcmc and check for convergence / burnin
 # source("Functions/RunMCMC_runjags.R") # run mcmc and check for convergence / burnin
 
