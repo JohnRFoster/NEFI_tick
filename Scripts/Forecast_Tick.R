@@ -11,29 +11,31 @@
 #   the forecast period.                              #   
 # =================================================== #
 
-library(ecoforecastR)
+library(rjags)
 library(tidyverse)
 library(lubridate)
 library(ncdf4)
+library(plantecophys)
 
 source("Functions/gefs_prior_functions.R")
-source("Functions/get_ticks_2006_2018.R")
+source("Functions/ticks_2020.R")
 source("Functions/convergence_check.R")
 source("Functions/scale_met_forecast.R")
+source("Functions/Future_Met.R")
 source("Functions/create_ncdf_tick.R")
 source("Models/tickForecastFilter_monthEffectLifeStage.R")
 
 date.pattern <- "\\d{4}-\\d{2}-\\d{2}"
 
 # =================================================== #
-#                  Testing set up                     #
+#                Site and dir set-up                  #
 # =================================================== #
 
 site.vec <- c("Green Control", "Henry Control", "Tea Control")
 
 ## read array job number and subset site
 # array.num <- as.numeric(Sys.getenv("SGE_TASK_ID"))
-array.num <- 2 # for testing
+array.num <- 2 # for testing 
 site.name <- site.vec[array.num]
 
 cat("Running forecast on", site.name, "\n")
@@ -59,67 +61,100 @@ out.dir <- file.path("../FinalOut/ForecastTestRuns", today.dir, "Cary",
                      specific.name,
                      site.dir.name)
 
-# check and create dir
-if(!dir.exists(out.dir)) dir.create(out.dir, recursive = TRUE)
-
 # parameter estimates in data list, only Apr:Dec fitted during training
 data <- update_data(params.mat, 4:12) 
 
-# using 2012 time series to test work flow
-ticks <- get_ticks_2006_2018("Henry Control")
-index.2012 <- which(year(ticks$date) == 2012)
-obs <- ticks$obs[,index.2012]   # 2012 observations
-y.vec <- obs[,1]
-obs <- obs[,2:5] # remove first set
-data$ic <- rpois(3, y.vec+1)         # initial condition, put in data for jags
+# 2020 observations
+ticks <- ticks_2020(site.name)
+obs.dates <- pull(ticks, Date)
+obs <- ticks %>% 
+  select(c(Larvae, Nymphs, Adult.total)) %>% 
+  t()
 
-# 2012 observation dates, change year to 2020
-obs.dates <- ymd(format(ticks$date[index.2012], "2020-%m-%d"))   
-obs.dates <- obs.dates[2:5] # first and last dates outside range
-ic.date <- obs.dates[1]   # date of observation
-latency <- rpois(length(obs.dates), 31)   # data latency, days after observation data is "posted"
-posted.days <- obs.dates + latency
+# data latency, days after observation data is "posted"
+latency <-  31  
+posted.days <- obs.dates + rpois(length(obs.dates), latency)
+
+y.vec <- obs[,1] # first observation vector
+data$ic <- rpois(rep(0, 3), y.vec+1)         # initial condition, put in data for jags
+
 
 # =================================================== #
-#                    Observed met                     #
+#               Observed met from Cary                #
 # =================================================== #
 
-dir.obs.met <- "../NOAA_Stations/Cary/" # where met is stored
+met.cary <- read.csv("/projectnb/dietzelab/fosterj/Data/CaryCurrentYearMet.csv")
+met.cary$DATE <- mdy(met.cary$DATE)
+met.cary <- met.cary %>% 
+  select(c("DATE","MAX_TEMP", "MIN_TEMP", "MAX_RH", "MIN_RH", "tot_prec")) 
+ 
+gdd <- rep(NA, nrow(met.cary))
+for(t in 1:nrow(met.cary)){
+  gdd[t] <- max(mean(met.cary$MAX_TEMP[t], met.cary$MIN_TEMP[t]) - 10, 0)
+}
+
+# create vpd and cumulative gdd
+met.cary$vpd <- RHtoVPD(met.cary$MIN_RH, met.cary$MIN_TEMP)
+met.cary$cdd <- cumsum(gdd)
+
+# scale to the training data means
+met.cary$MAX_TEMP <- met.cary$MAX_TEMP - hist.means["MAX_TEMP"]
+met.cary$MIN_TEMP <- met.cary$MIN_TEMP - hist.means["MIN_TEMP"]
+met.cary$MAX_RH <- met.cary$MAX_RH - hist.means["MAX_RH"]
+met.cary$MIN_RH <- met.cary$MIN_RH - hist.means["MIN_RH"]
+met.cary$vpd <- met.cary$vpd - hist.means["vpd"]
+
+
+# =================================================== #
+#               Observed met from NOAA                #
+# =================================================== #
+
+# last day of Cary weather observations
+# updated monthly
+last.day <- last(met.cary$DATE)
+
+dir.obs.met <- "../NOAA_Stations/Cary/" # where noaa met is stored
 files <- list.files(dir.obs.met)
 
 # need to get number of variables to store
 met.ncdf <- nc_open(paste0(dir.obs.met, files[1]))
 n.var <- length(met.ncdf$var) # number of variables
 var.names <- names(met.ncdf$var) # variable names
-met.observed.dates <- str_extract(files, date.pattern) # dates with  observed met
+noaa.observed.dates <- ymd(str_extract(files, date.pattern)) # dates with  observed met
 
-met.observed <- matrix(NA, length(files), n.var) # met data
+# get subset of noaa station observations we need
+noaa.needed <- which(noaa.observed.dates > last.day) # index of dates
+files <- files[noaa.needed]
+
+noaa.observed <- matrix(NA, length(files), n.var) # met data
 for(i in seq_along(files)){
   met.ncdf <- nc_open(paste0(dir.obs.met, files[i]))  
   for(v in seq_along(var.names)){
-    met.observed[i, v] <- ncvar_get(met.ncdf, var.names[v])
-    met.observed[i, v] <- ncvar_get(met.ncdf, var.names[v])
-    met.observed[i, v] <- ncvar_get(met.ncdf, var.names[v])  
+    noaa.observed[i, v] <- ncvar_get(met.ncdf, var.names[v])
+    noaa.observed[i, v] <- ncvar_get(met.ncdf, var.names[v])
+    noaa.observed[i, v] <- ncvar_get(met.ncdf, var.names[v])  
   }
 }
-colnames(met.observed) <- var.names
+colnames(noaa.observed) <- var.names
 
 # last date of weather observations
-last.met.obs.date <- ymd(met.observed.dates[length(met.observed.dates)])
+last.noaa.date <- last(noaa.observed.dates)
 
 # calculate growing degree days with base 10
 # need to do this before centering other variables to historical means
+# NEED TO FIGURE OUT HOW TO BLEND WITH CARY STATION DATA
+
 base <- 10
-gdd <- rep(NA, nrow(met.observed))
-for(i in 1:nrow(met.observed)){
-  gdd[i] <- max(mean(met.observed[i, "TMAX"], met.observed[i, "TMIN"]) - base, 0)
+gdd <- rep(NA, nrow(noaa.observed))
+for(i in 1:nrow(noaa.observed)){
+  gdd[i] <- max(mean(noaa.observed[i, "TMAX"], noaa.observed[i, "TMIN"]) - base, 0)
 }
 
 # add cumulative growing degree days to observed met
-met.observed <- met.observed %>% 
+noaa.observed <- noaa.observed %>% 
   as.data.frame() %>% 
   mutate(cum.gdd = cumsum(gdd)) %>% 
-  mutate(Date = ymd(met.observed.dates)) %>% 
+  mutate(Date = ymd(noaa.observed.dates)) %>% 
   mutate(TMAX = TMAX - hist.means["MAX_TEMP"]) %>% # center to historical means
   mutate(TMIN = TMIN - hist.means["MIN_TEMP"])
 
@@ -129,9 +164,9 @@ files.gefs <- list.files(dir.gefs)
 met.gefs.dates <- ymd(str_extract(files.gefs, date.pattern))
 
 # indexing for known met and gefs
-n.adapt <- 5000
+n.adapt <- 50#00
 n.chains <- 5
-n.iter <- 100000
+n.iter <- 100#000
 
 # forecast loop, need to check:
 # 1. if there is a new tick observation
@@ -139,8 +174,8 @@ n.iter <- 100000
 every.day <- seq.Date(met.gefs.dates[1]+4, today(), by = 1) # everyday 
 forecast.start.day <- "2020-05-20" # day forecast stems from
 
-for(i in seq_along(every.day)){
-# i=1
+# for(i in seq_along(every.day)){
+i=1
   cat("\n\n===================================================\n\n")
   
   per <- i / length(every.day) * 100
@@ -149,7 +184,7 @@ for(i in seq_along(every.day)){
   current.day <- every.day[i]  # date forecast is made
   
   # usually run three or four days behind
-  last.met.obs.date <- current.day - 4 
+  last.noaa.date <- current.day - 4 
   
   # need to check if there is a new tick observation
   # this determines new initial condition and forecast start day
@@ -197,8 +232,8 @@ for(i in seq_along(every.day)){
   } 
 
   # subset observed met
-  build.obs.met <- met.observed %>% 
-    filter(Date <= last.met.obs.date) %>% 
+  build.obs.met <- noaa.observed %>% 
+    filter(Date <= last.noaa.date) %>% 
     filter(Date >= forecast.start.day)
   
   # cumulative growing degree days at end of observation period
@@ -206,16 +241,16 @@ for(i in seq_along(every.day)){
   end.cum.gdd <- build.obs.met$cum.gdd[nrow(build.obs.met)]
   
   # grab GEFS
-  gefs.needed <- match(ymd(last.met.obs.date)+1, met.gefs.dates)
+  gefs.needed <- match(ymd(last.noaa.date)+1, met.gefs.dates)
   
   # some gefs days did not download, 
   # this finds the most recent day for non-existent gefs files
   gefs.diff <- 0 # reset 
   if(is.na(gefs.needed)){
     # time difference between last observed date and dates we have gefs forecasts
-    lag.days <- difftime(ymd(last.met.obs.date)+1, met.gefs.dates)
+    lag.days <- difftime(ymd(last.noaa.date)+1, met.gefs.dates)
     gefs.needed <- which(lag.days == min(lag.days[lag.days >= 0], na.rm = TRUE))
-    gefs.diff <- as.numeric(difftime(ymd(last.met.obs.date)+1, met.gefs.dates[gefs.needed]))
+    gefs.diff <- as.numeric(difftime(ymd(last.noaa.date)+1, met.gefs.dates[gefs.needed]))
   }
   days.2.grab <- files.gefs[gefs.needed] # gefs date we need
   
@@ -284,7 +319,7 @@ for(i in seq_along(every.day)){
   
   cat("Forecast initial conditions and start day:", as.character(forecast.start.day), "\n")
   cat("Forecast is being run on:", as.character(current.day), "\n")
-  cat("Most recent weather observation:", as.character(last.met.obs.date), "\n")
+  cat("Most recent weather observation:", as.character(last.noaa.date), "\n")
   cat("The GEFS file assimilated:", days.2.grab, "\n")
   
   # compile and sample
@@ -314,6 +349,9 @@ for(i in seq_along(every.day)){
                    params = params,
                    start.date = forecast.start.day,
                    data.assimilation = data.assimilation)
+  
+  # check and create dir
+  if(!dir.exists(out.dir)) dir.create(out.dir, recursive = TRUE)
   
   save(preds, params, ncfname,
        file = file.path(out.dir, "test.params.RData"))
