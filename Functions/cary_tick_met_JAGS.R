@@ -15,17 +15,13 @@
 #' @examples cary_ticks_JAGS(sites = sites,state.null = 7)
 
 library(plantecophys)
-cary_ticks_met_JAGS <- function(state.interval=NULL, dir=NULL){
-  sites <- c("Green Control","Henry Control","Tea Control")
-  N_site <- length(sites)               # number of sites
-  if(is.null(dir)){
-    raw.dat <- read.csv("../tick_cleaned")   # read in data  
-    met <- read.csv("../Met_Cary")
-  } else {
-    raw.dat <- read.csv(paste0(dir, "../tick_cleaned"))
-    met <- read.csv(paste0(dir, "../Met_Cary"))
-  }
+cary_ticks_met_JAGS <- function(sites = c("Green Control","Henry Control","Tea Control"),
+                                state.interval=NULL){
   
+  N_site <- length(sites)               # number of sites
+  raw.dat <- read.csv("/projectnb/dietzelab/fosterj/Data/tick_cleaned")   # read in data  
+  met <- read.csv("/projectnb/dietzelab/fosterj/Data/Cary_Met_Data_Daily.csv")
+ 
   raw.dat$DATE <- as.Date(raw.dat$DATE) # convert to date
   
   # storage
@@ -105,12 +101,16 @@ cary_ticks_met_JAGS <- function(state.interval=NULL, dir=NULL){
   met <- met[, c("DATE","MIN_TEMP","MAX_TEMP","MAX_RH","MIN_RH","TOT_PREC")]
   
   ## cumulative gdd calculation
-  met$DATE <- as.Date(met$DATE)
-  year <- format(as.Date(met$DATE, format="%Y-%m-%d"),"%Y")#[met.seq]
-  year <- as.numeric(as.factor(year))
+  met$DATE <- lubridate::mdy(met$DATE)
+  met <- met %>% 
+    filter(DATE >= "1995-01-01") %>% 
+    mutate(year = year(DATE))
   
-  met$year <- format(as.Date(met$DATE, format="%Y-%m-%d"),"%Y")
-  met$year <- as.numeric(as.factor(met$year))
+  year <- met %>% 
+    pull(year) %>% 
+    unique()
+  
+  # met$year <- as.numeric(as.factor(met$year))
   
   calc_gdd <- function(base=10, max, min){
     gdd <- max(mean(max, min) - base, 0)
@@ -118,7 +118,7 @@ cary_ticks_met_JAGS <- function(state.interval=NULL, dir=NULL){
   
   gdd.vec <- vector()
   cum.gdd <- vector()
-  for(i in 1:length(unique(met$year))){
+  for(i in year){
     subset <- subset(met, year == i)
     min.missing <- which(is.na(subset$MIN_TEMP))
     max.missing <- which(is.na(subset$MAX_TEMP))
@@ -131,9 +131,9 @@ cary_ticks_met_JAGS <- function(state.interval=NULL, dir=NULL){
     cum.gdd <- c(cum.gdd, cumsum(gdd))
     gdd.vec <- c(gdd.vec, gdd)
   }
-  names(cum.gdd) <- names(year) <- met$DATE
+  # names(cum.gdd) <- names(year) <- met$DATE
 
-  gdd <- matrix(NA, 3, 3767)
+  gdd <- matrix(NA, N_site, 3767)
   met$vpd <- RHtoVPD(met$MIN_RH, met$MIN_TEMP)
   met$MIN_TEMP <- scale(met$MIN_TEMP, scale = FALSE)
   met$MAX_TEMP <- scale(met$MAX_TEMP, scale = FALSE)

@@ -47,7 +47,7 @@ site_data_met <- function(site, met.variable, data, dir = "",
   }
   
   if(!is.null(time.effect)){
-    raw.dat <- read.csv(paste0(dir, "../tick_cleaned"))
+    raw.dat <- read.csv("/projectnb/dietzelab/fosterj/Data/tick_cleaned")
     raw.dat$DATE <- as.Date(raw.dat$DATE) # convert to date
     
     dates <- raw.dat %>% 
