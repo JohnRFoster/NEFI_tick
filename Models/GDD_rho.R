@@ -60,7 +60,16 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
   
   # data$nymph.beta.mu <- survival$nymph.beta.mean
   # data$nymph.beta.prec <- survival$nymph.beta.prec
-
+  
+  
+  load("../FinalOut/A_Correct/RhoModels/RhoAllStart/MonthEffect/DiffPriors/Henry/Combined_thinMat_RhoStartMonthEffect_LifeStageDiffPriors_HenryControl.RData")
+  henry <- apply(params.mat, 2, mean)
+  
+  alpha.month <- matrix(NA, nrow = 3, ncol = 12)
+  alpha.month[1,4:12] <- rnorm(1, henry[grep("alpha.month[1,", names(henry), fixed = TRUE)], 1)
+  alpha.month[2,4:12] <- rnorm(1, henry[grep("alpha.month[2,", names(henry), fixed = TRUE)], 1)
+  alpha.month[3,4:12] <- rnorm(1, henry[grep("alpha.month[3,", names(henry), fixed = TRUE)], 1)
+  
   inits <- function() {
     list(
       p = data$y[, -1],
@@ -72,7 +81,8 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
       rho.l = runif(1, 1400, 1600),
       rho.n = runif(1, 400, 600),
       grow.ln.mu = rnorm(1, -6, 0.1),
-      grow.na.mu = rnorm(1, -6, 0.1)
+      grow.na.mu = rnorm(1, -6, 0.1),
+      alpha.month = alpha.month
     )
   }
   
@@ -154,7 +164,7 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains) {
     theta.21[t] <- ifelse((gdd[t] >= rho.n) && (gdd[t] <= 2500),l2n,0)
     theta.32[t] <- ifelse((gdd[t] <= 1000) || (gdd[t] >= rho.a),n2a,0)
     lambda[t] <- ifelse((gdd[t] >= rho.l) && (gdd[t] <= 2500),repro.mu,0)
-  
+    
     A.day[1,1,t] <- phi.11*(1-theta.21[t])
     A.day[2,1,t] <- phi.11*theta.21[t]
     A.day[2,2,t] <- phi.22*(1-theta.32[t])
