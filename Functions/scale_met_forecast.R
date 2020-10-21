@@ -1,6 +1,6 @@
 library(plantecophys)
 library(dplyr)
-scale_met_forecast <- function(dir = ""){
+scale_met_forecast <- function(){
   met <- read.csv("/projectnb/dietzelab/fosterj/Data/Cary_Met_Data_Daily.csv")
   met$DATE <- lubridate::mdy(met$DATE)
   met <- met %>% 
