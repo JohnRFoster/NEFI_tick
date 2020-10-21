@@ -3,7 +3,7 @@
 mice_estimated_jags <- function(site.run){
   
   ### mouse data
-  mice <- read.csv("../Cary_mouse.csv")
+  mice <- read.csv("/projectnb/dietzelab/fosterj/Data/Cary_mouse.csv")
   mice <- subset(mice, Grid == site.run)
   mice$Full.Date.1 <- as.Date(mice$Full.Date.1)
   mice$Full.Date.2 <- as.Date(mice$Full.Date.2)
@@ -30,19 +30,19 @@ mice_estimated_jags <- function(site.run){
   
   predict <- as.matrix(out$predict)
   
-  # thin to 5000 iterations and sort
+  # thin to 5000 iterations
   predict <- predict[seq(1, nrow(predict), by = round(nrow(predict)/5000)),] 
-  predict.sort <- apply(predict, 2, sort)
+  # predict <- apply(predict, 2, sort)
   
   mice.est.ci <- list()
-  mice.est.ci[[1]] <- predict.sort[,1]
-  for(t in 2:ncol(predict.sort)){
+  mice.est.ci[[1]] <- predict[,1]
+  for(t in 2:ncol(predict)){
     time.diff <- as.numeric(difftime(mice.obs[t], mice.obs[t-1]))
     if(time.diff > 1){
       x <- c(1, time.diff)
-      interpol <- matrix(NA, nrow(predict.sort), time.diff+1)
-      for(i in 1:nrow(predict.sort)){
-        y <- c(predict.sort[i,t-1], predict.sort[i,t])
+      interpol <- matrix(NA, nrow(predict), time.diff+1)
+      for(i in 1:nrow(predict)){
+        y <- c(predict[i,t-1], predict[i,t])
         interpol[i,] <- approx(x, y, n = time.diff+1, method = "linear")$y 
       }
       mice.est.ci[[t]] <- interpol 
@@ -58,7 +58,7 @@ mice_estimated_jags <- function(site.run){
   mice.all.days.sd <- apply(mice.sort.all.days, 2, sd)
   
   # tick data
-  dat <- read.csv("../tick_cleaned") # tick data
+  dat <- read.csv("/projectnb/dietzelab/fosterj/Data/tick_cleaned") # tick data
   tick <- dat[,c("Grid", "DATE", "n_larvae", "n_nymphs", "n_adults")]
   tick <- subset(tick, Grid == site.run)
   tick$DATE <- as.Date(tick$DATE)
