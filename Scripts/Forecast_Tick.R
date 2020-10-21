@@ -16,6 +16,7 @@ library(tidyverse)
 library(lubridate)
 library(ncdf4)
 library(plantecophys)
+library(rvest)
 
 source("Functions/gefs_prior_functions.R")
 source("Functions/ticks_2020.R")
@@ -39,9 +40,6 @@ array.num <- 2 # for testing
 site.name <- site.vec[array.num]
 
 cat("Running forecast on", site.name, "\n")
-
-## training met data means
-hist.means <- scale_met_forecast()
 
 ## parameter estimates from historical fit
 top.dir <- "../FinalOut/A_Correct"   # all fitted models start here
@@ -80,7 +78,7 @@ data$ic <- rpois(rep(0, 3), y.vec+1)         # initial condition, put in data fo
 
 
 # =================================================== #
-#               Observed met from Cary                #
+#       Observed met from Cary, previous months       #
 # =================================================== #
 
 met.cary <- read.csv("/projectnb/dietzelab/fosterj/Data/CaryCurrentYearMet.csv")
@@ -88,6 +86,34 @@ met.cary$DATE <- mdy(met.cary$DATE)
 met.cary <- met.cary %>% 
   select(c("DATE","MAX_TEMP", "MIN_TEMP", "MAX_RH", "MIN_RH", "tot_prec")) 
  
+# =================================================== #
+#       Observed met from Cary, current month         #
+# =================================================== #
+
+# scrape current month table from Cary's website
+month.url <- "http://www.caryinstitute.org/science/research-projects/environmental-monitoring-program/weather-climate"
+webpage <- read_html(month.url)
+tbls <- html_nodes(webpage, "table")
+
+current.month <- webpage %>%
+  html_nodes("table") %>%
+  .[1] %>%                                # first table on the page is daily summaries
+  html_table(fill = TRUE) %>% 
+  as.data.frame() %>% 
+  select(c("DATE", "MAX..TEMP...F.", "MIN..TEMP...F.", "TOTAL.PRECIP...in..")) %>% 
+  rename("MAX_TEMP" = "MAX..TEMP...F.",   # rename to match met.cary
+         "MIN_TEMP" = "MIN..TEMP...F.", 
+         "tot_prec" = "TOTAL.PRECIP...in..") %>% 
+  mutate("DATE" = mdy(DATE),
+         "MAX_TEMP" = (MAX_TEMP-32)*5/9,  # F to C
+         "MIN_TEMP" = (MIN_TEMP-32)*5/9,
+         "MAX_RH" = NA,                   # don't have RH for current month
+         "MIN_RH" = NA,
+         "tot_prec" = tot_prec/25.4)      # in to mm
+
+# combine to single data set
+met.cary <- bind_rows(met.cary, current.month)
+
 gdd <- rep(NA, nrow(met.cary))
 for(t in 1:nrow(met.cary)){
   gdd[t] <- max(mean(met.cary$MAX_TEMP[t], met.cary$MIN_TEMP[t]) - 10, 0)
@@ -98,6 +124,7 @@ met.cary$vpd <- RHtoVPD(met.cary$MIN_RH, met.cary$MIN_TEMP)
 met.cary$cdd <- cumsum(gdd)
 
 # scale to the training data means
+hist.means <- scale_met_forecast()     # training met data means
 met.cary$MAX_TEMP <- met.cary$MAX_TEMP - hist.means["MAX_TEMP"]
 met.cary$MIN_TEMP <- met.cary$MIN_TEMP - hist.means["MIN_TEMP"]
 met.cary$MAX_RH <- met.cary$MAX_RH - hist.means["MAX_RH"]
@@ -106,62 +133,30 @@ met.cary$vpd <- met.cary$vpd - hist.means["vpd"]
 
 
 # =================================================== #
-#               Observed met from NOAA                #
+#             Cary Climate Ensembles                  #
 # =================================================== #
 
-# last day of Cary weather observations
-# updated monthly
-last.day <- last(met.cary$DATE)
 
-dir.obs.met <- "../NOAA_Stations/Cary/" # where noaa met is stored
-files <- list.files(dir.obs.met)
 
-# need to get number of variables to store
-met.ncdf <- nc_open(paste0(dir.obs.met, files[1]))
-n.var <- length(met.ncdf$var) # number of variables
-var.names <- names(met.ncdf$var) # variable names
-noaa.observed.dates <- ymd(str_extract(files, date.pattern)) # dates with  observed met
+# =================================================== #
+#                   NOAA GEFS                         #
+# =================================================== #
 
-# get subset of noaa station observations we need
-noaa.needed <- which(noaa.observed.dates > last.day) # index of dates
-files <- files[noaa.needed]
+# directories
+dir.gefs.rnoaa <- "/projectnb/dietzelab/fosterj/Data/GEFSrnoaa/Cary/" # from rnoaa downloads
+dir.gefs.point <- "/projectnb/dietzelab/fosterj/Data/GEFSpoint/NOAAGEFS_6hr/CARY/" # from noaaGEFSpoint
 
-noaa.observed <- matrix(NA, length(files), n.var) # met data
-for(i in seq_along(files)){
-  met.ncdf <- nc_open(paste0(dir.obs.met, files[i]))  
-  for(v in seq_along(var.names)){
-    noaa.observed[i, v] <- ncvar_get(met.ncdf, var.names[v])
-    noaa.observed[i, v] <- ncvar_get(met.ncdf, var.names[v])
-    noaa.observed[i, v] <- ncvar_get(met.ncdf, var.names[v])  
-  }
-}
-colnames(noaa.observed) <- var.names
+# currently not operational
+# dir.gefs.grid <- "/projectnb/dietzelab/fosterj/Data/GEFSgrid/"  
 
-# last date of weather observations
-last.noaa.date <- last(noaa.observed.dates)
+# get dates from the different directories
+files.rnoaa <- list.files(dir.gefs.rnoaa)
+dates.rnoaa <- ymd(str_extract(files.rnoaa, date.pattern))
 
-# calculate growing degree days with base 10
-# need to do this before centering other variables to historical means
-# NEED TO FIGURE OUT HOW TO BLEND WITH CARY STATION DATA
+files.point <- list.files(dir.gefs.point)
+dates.point <- ymd(files.point)
 
-base <- 10
-gdd <- rep(NA, nrow(noaa.observed))
-for(i in 1:nrow(noaa.observed)){
-  gdd[i] <- max(mean(noaa.observed[i, "TMAX"], noaa.observed[i, "TMIN"]) - base, 0)
-}
 
-# add cumulative growing degree days to observed met
-noaa.observed <- noaa.observed %>% 
-  as.data.frame() %>% 
-  mutate(cum.gdd = cumsum(gdd)) %>% 
-  mutate(Date = ymd(noaa.observed.dates)) %>% 
-  mutate(TMAX = TMAX - hist.means["MAX_TEMP"]) %>% # center to historical means
-  mutate(TMIN = TMIN - hist.means["MIN_TEMP"])
-
-dir.gefs <- "../GEFS/Cary/"
-files.gefs <- list.files(dir.gefs)
-
-met.gefs.dates <- ymd(str_extract(files.gefs, date.pattern))
 
 # indexing for known met and gefs
 n.adapt <- 50#00
