@@ -2,59 +2,69 @@ library(ecoforecastR)
 library(runjags)
 
 source("Functions/split_out.R")
+
 type <- "ind"
 # type <- "hb"
 
+start <- 1
+num.chains <- c(1, 2, 3, 4, 5)
 
+force <- FALSE
+cat("force =", force, "\n")
+
+gbr.thresh <- 1.06        # convergence threshold
+min.effect.size <- 4000   # minimum effective sample size threshold
 
 if(type == "ind"){
   ## Independent Models ##
   sites <- c("Green", "Henry", "Tea")
   
-  start <- 1
-  num.out <- c(27, 27, 27)
-  
   # read array job number to paste into output file
-  xx <- as.numeric(Sys.getenv("SGE_TASK_ID")) 
-  
+  xx <- as.numeric(Sys.getenv("SGE_TASK_ID"))
   site <- sites[xx]
-  num.out <- num.out[xx]
-  
-  dir <- paste0("../FinalOut/A_Correct/ObsProcModels/Obs_L1N0A0.Proc_NymphRh/", site)
-  model <- paste0("Obs_L1N0A0.Proc_NymphRH_", site, "Control")
-  # model.save <- paste0("Obs_L1N0A0.Proc_AdultVPD_VPDDiff_", site, "Control")
+
+  dir <- paste0("../FinalOut/A_Correct/Mice/NymphToAdult/", site)
+  model <- paste0("MiceNymphToAdult_", site, "Control")
+  # model.save <- paste0("RhoStartMonthEffect_LifeStageDiffPriors_", site, "Control")
   model.save <- model
+
 } else if(type == "hb"){
   
-  dir <- "../FinalOut/A_Correct/NULL_HB"
-  model <- "NullObs_HB_K_set"
+  dir <- "../FinalOut/A_Correct/Mice/LarvaToNymph/"
+  model <- "NymphVPD_HB_K_set"
+  model.save <- model
   continue <- TRUE
-  start <- 10
-  num.out <- 17
+
+}
+cat("Running mcmc diagnostics on", model, "\n")
+
+
+files <- list.files(dir)
+
+# check if already completed
+finished <- grepl("Combined", files)
+if(any(finished)) stop("Already combined!", call. = FALSE)
+
+
+# count number of segments per chain
+split.chains <- rep(NA, length(num.chains))
+for(c in num.chains){
+  pattern <- paste0(model, c)
+  split.chains[c] <- length(grep(pattern, files))
 }
 
-
-# dir <- paste0("../FinalOut/HB_Obs1_Proc1/VPDProc")
-# model <- paste0("VPD_ObsProc_beta_111_K_set")
-
-cat("Running mcmc diagnostics on", model, "\n")
+# check if there are enough chains to combine
+num.out <- min(split.chains)
+cat("Number of out segments:", num.out, "\n")
+if(num.out <= 1) stop("Not enough segments to combine for at least one chain!", call. = FALSE)
 
 load.dir <- file.path(dir, model)
 
 iter.run <- 100000 # number of iterations in each 'out' segment 
-num.chains <- c(1, 2, 3, 4, 5)
-
-
-gbr.thresh <- 1.03
-min.effect.size <- 4000
-
-force <- TRUE
-cat("force =", force, "\n")
-
 total.iter <- iter.run * num.out
+
 cat("Total iterations in each chain:", total.iter, "\n")
 cat("Chains being combined:", num.chains, "\n")
-cat("Number of out segments:", num.out, "\n")
 cat("Convergence threshold:", gbr.thresh, "\n")
 cat("Minimum effective sample size:", min.effect.size, "\n")
 
@@ -95,13 +105,13 @@ GBR.vals
 cat("Determining burnin\n")
 GBR <- gelman.plot(params)
 burnin <- GBR$last.iter[tail(which(apply(GBR$shrink[,,2]>gbr.thresh,1,any)),1)+1]
-if(is.na(burnin)){
+if(is.na(burnin) & !force){
   stop("Model not converged!", call. = FALSE)
 } else {
   cat("Burnin after:", burnin, "iterations\n")  
 }
 
-## determine the segment that burnin occured
+## determine the segment that burnin occurred
 start <- ceiling(burnin / iter.run)
 params.burn <- window(params, start = (start-1)*iter.run+1)
 
@@ -188,10 +198,4 @@ if((!is.na(burnin) & converge & enough.samples) | force){
   summary(params.burn)
 }
 
-
-
 cat("\n--- DONE ---\n")
-
-
-
-
