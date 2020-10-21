@@ -65,12 +65,13 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
                "phi.l.mu",
                "phi.n.mu",
                "phi.a.mu",
-               "beta.l2n",
+               "beta.n2a",
+               # "beta.l2n",
                "grow.ln.mu",
                "grow.na.mu",
                "repro.mu",
                "SIGMA",
-               "mice",
+               # "mice",
                "theta.nymph",
                "theta.adult",
                "beta.l.obs")
@@ -89,7 +90,8 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
   SIGMA ~ dwish(R, 4)         # mvn [3 x 3] site process
 
   ### beta priors
-  beta.l2n ~ dnorm(0, 0.1)
+  beta.n2a ~ dnorm(0, 0.1)
+  # beta.l2n ~ dnorm(0, 0.1)
 
   ## observation regression priors
   beta.l.obs ~ dnorm(0, 0.001) T(1E-10,)
@@ -116,16 +118,16 @@ run_model <- function(site.run, met.proc, n.adapt, n.chains){
   
   logit(phi.11) <- phi.l.mu 
   logit(phi.22) <- phi.n.mu 
-  logit(n2a) <- grow.na.mu
+  logit(l2n) <- grow.ln.mu
   
   ### define parameters
   for(t in 1:N_days){   # loop over every day in time series
   
     mice[t] ~ dnorm(mice.mean[t], mice.prec[t]) T(0,)
-    logit(l2n[t]) <- grow.ln.mu + beta.l2n*mice[t]
+    logit(n2a[t]) <- grow.na.mu + beta.n2a*mice[t]
     
-    theta.21[t] <- ifelse((gdd[t] >= 500) && (gdd[t] <= 2500),l2n[t],0)
-    theta.32[t] <- ifelse((gdd[t] <= 1000) || (gdd[t] >= 2500),n2a,0)
+    theta.21[t] <- ifelse((gdd[t] >= 500) && (gdd[t] <= 2500),l2n,0)
+    theta.32[t] <- ifelse((gdd[t] <= 1000) || (gdd[t] >= 2500),n2a[t],0)
     lambda[t] <- ifelse((gdd[t] >= 1500) && (gdd[t] <= 2500),repro.mu,0)
     
     A.day[1,1,t] <- phi.11*(1-theta.21[t]) 
