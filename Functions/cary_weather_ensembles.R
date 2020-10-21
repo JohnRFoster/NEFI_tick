@@ -2,7 +2,7 @@ library(plantecophys)
 library(dplyr)
 library(lubridate)
 
-cary_weather_ensembles <- function(var, n.ens = 21){
+cary_weather_ensembles <- function(var){
   met <- read.csv("/projectnb/dietzelab/fosterj/Data/Cary_Met_Data_Daily.csv")
   met <- met %>% 
     mutate(DATE = mdy(DATE)) %>% 
