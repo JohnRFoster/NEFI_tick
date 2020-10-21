@@ -3,8 +3,8 @@ setwd("/projectnb/dietzelab/fosterj/NEFI_tick")
 
 # devtools::install_github("rqthomas/noaaGEFSpoint")
 library(rNOMADS)
-Sys.setenv(PATH = "/projectnb/dietzelab/fosterj/grib2/wgrib2/")
-
+# Sys.setenv(PATH = "/projectnb/dietzelab/fosterj/grib2/wgrib2/")
+library(rgdal)
 library(noaaGEFSpoint)
 library(tidyverse)
 library(lubridate)
@@ -18,20 +18,20 @@ cat("GEFS Specifications:\n")
 output.directory <- "/projectnb/dietzelab/fosterj/Data"
 cat("Output directory", output.directory, "\n")
 
-site_file <- system.file("extdata", "noaa_download_site_list.csv", package = "noaaGEFSpoint")
-neon_sites <- read.csv(site_file) # read site file .csv
-colnames(neon_sites)[1] <- "site_name" # rename
-cary.info <- data.frame(site_name = "Cary Institute", # add Cary to neon_sites df
-                        site_id = "CARY",
-                        latitude = 41.7851,
-                        longitude = -73.7338)
-neon_sites <- bind_rows(neon_sites, cary.info)
-
-# subset to tick (Ixodes and Amblyomma) prominent sites 
-neon_sites <- neon_sites %>% 
-  filter(site_id %in% c("HARV", "CARY", "BLAN", "ORNL", "SCBI", 
-                        "SERC", "KONZ", "OSBS", "TALL", "UKFS"))
-cat(nrow(neon_sites), "sites:", neon_sites$site_id, "\n")
+# site_file <- system.file("extdata", "noaa_download_site_list.csv", package = "noaaGEFSpoint")
+# neon_sites <- read.csv(site_file) # read site file .csv
+# colnames(neon_sites)[1] <- "site_name" # rename
+# cary.info <- data.frame(site_name = "Cary Institute", # add Cary to neon_sites df
+#                         site_id = "CARY",
+#                         latitude = 41.7851,
+#                         longitude = -73.7338)
+# neon_sites <- bind_rows(neon_sites, cary.info)
+# 
+# # subset to tick (Ixodes and Amblyomma) prominent sites 
+# neon_sites <- neon_sites %>% 
+#   filter(site_id %in% c("HARV", "CARY", "BLAN", "ORNL", "SCBI", 
+#                         "SERC", "KONZ", "OSBS", "TALL", "UKFS"))
+# cat(nrow(neon_sites), "sites:", neon_sites$site_id, "\n")
 
 # set up parallel, default is false
 n.cores <- 6 # for testing
@@ -50,7 +50,7 @@ cat("Download method:", method, "\n")
 overwrite <- FALSE
 downscale <- FALSE
 forecast.time <- "all"
-forecast.date <- "latest"
+forecast.date <- "all"
 
 cat("Downscale:", downscale, "\n")
 cat("Overwrite:", overwrite, "\n")
@@ -58,29 +58,29 @@ cat("Forecast time:", forecast.time, "\n")
 cat("Forecast date:", forecast.date, "\n")
 
 
-cat("Running noaa_gefs_download_downscale() with method = point\n")
-noaaGEFSpoint::noaa_gefs_download_downscale(site_list = neon_sites$site_id, 
-                                            lat_list = neon_sites$latitude, 
-                                            lon_list = neon_sites$longitude, 
-                                            output_directory = file.path(output.directory, "GEFSpoint"),
-                                            forecast_time = forecast.time,
-                                            forecast_date = forecast.date,
-                                            downscale = downscale, 
-                                            run_parallel = run.par, 
-                                            num_cores = n.cores, 
-                                            method = "point",
-                                            overwrite = overwrite)
+# cat("Running noaa_gefs_download_downscale() with method = point\n")
+# noaaGEFSpoint::noaa_gefs_download_downscale(site_list = "CARY",
+#                                             lat_list = 41.7851,
+#                                             lon_list = -73.7338,
+#                                             output_directory = file.path(output.directory, "GEFSpoint"),
+#                                             forecast_time = forecast.time,
+#                                             forecast_date = forecast.date,
+#                                             downscale = downscale,
+#                                             run_parallel = run.par,
+#                                             num_cores = n.cores,
+#                                             method = "point",
+#                                             overwrite = overwrite)
 
-cat("Running noaa_gefs_download_downscale() with method = grid\n")
-noaaGEFSpoint::noaa_gefs_download_downscale(site_list = neon_sites$site_id, 
-                                            lat_list = neon_sites$latitude, 
-                                            lon_list = neon_sites$longitude, 
+cat("Running noaa_gefs_download_downscale() with method = grid, run_parallel = FALSE\n")
+noaaGEFSpoint::noaa_gefs_download_downscale(site_list = "CARY",
+                                            lat_list = 41.7851,
+                                            lon_list = -73.7338,
                                             output_directory = file.path(output.directory, "GEFSgrid"), 
                                             forecast_time = forecast.time,
                                             forecast_date = forecast.date,
                                             downscale = downscale, 
-                                            run_parallel = run.par, 
-                                            num_cores = n.cores, 
+                                            run_parallel = FALSE, 
+                                            num_cores = 1, 
                                             method = "grid",
                                             overwrite = overwrite)
 
