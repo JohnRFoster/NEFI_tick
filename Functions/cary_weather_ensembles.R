@@ -23,7 +23,6 @@ cary_weather_ensembles <- function(var){
   
   n.years <- length(year)
   
-  gdd.vec <- vector()
   cum.gdd <- vector()
   for(i in year){
     subset <- subset(met, year == i)
@@ -36,10 +35,9 @@ cary_weather_ensembles <- function(var){
       gdd[t] <- calc_gdd(10, subset$MAX_TEMP[t], subset$MIN_TEMP[t]) 
     }
     cum.gdd <- c(cum.gdd, cumsum(gdd))
-    gdd.vec <- c(gdd.vec, gdd)
   }
   
-  met$cdd <- gdd.vec
+  met$cdd <- cum.gdd
   
   met.sample <- met %>%  
     select(all_of(c("Year", "doy", var))) %>% 
