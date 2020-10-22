@@ -8,9 +8,9 @@
 library(tidyverse)
 library(xlsx)
 
-get_ticks_2006_2018 <- function(site, dir = ""){
-  t <- read.xlsx(paste0(dir, "../Mous_mast_Tick_Drag_2006_2018_dateEdit.xlsx")
-                 , sheetIndex = 1, startRow = 3) 
+get_ticks_2006_2018 <- function(site){
+  t <- read.xlsx("/projectnb/dietzelab/fosterj/Data/Mous_mast_Tick_Drag_2006_2018_dateEdit.xlsx",
+                 sheetIndex = 1, startRow = 3) 
   
   # compute absolute number of ticks caught by multiplying density by area (450 m^2)of tick drags
   individual.ticks <- t[,-7] %>% # 7th column is just NA
