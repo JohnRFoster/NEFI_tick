@@ -17,12 +17,14 @@ library(lubridate)
 library(ncdf4)
 library(plantecophys)
 library(rvest)
+library(xlsx)
 
 source("Functions/gefs_prior_functions.R")
 source("Functions/ticks_2020.R")
+source("Functions/get_ticks_2006_2018.R")
 source("Functions/convergence_check.R")
 source("Functions/scale_met_forecast.R")
-source("Functions/Future_Met.R")
+source("Functions/cary_weather_ensembles.R")
 source("Functions/create_ncdf_tick.R")
 source("Models/tickForecastFilter_monthEffectLifeStage.R")
 
@@ -70,12 +72,48 @@ obs <- ticks %>%
   t()
 
 # data latency, days after observation data is "posted"
-latency <-  31  
-posted.days <- obs.dates + rpois(length(obs.dates), latency)
+latency <- 31  
+posted.days <- obs.dates + latency
 
-y.vec <- obs[,1] # first observation vector
-data$ic <- rpois(rep(0, 3), y.vec+1)         # initial condition, put in data for jags
+cat("Observations on:", as.character(obs.dates), "\n")
+cat("Posted on:", as.character(posted.days), "\n")
 
+# indexing for known met and gefs
+n.adapt <- 50#00
+n.chains <- 5
+n.iter <- 100#000
+
+forecast.start.day <- "2020-05-19" # day forecast stems from
+every.day <- seq.Date(ymd(forecast.start.day), today(), by = 1) # everyday
+
+# =================================================== #
+#                Initial Conditions                   #
+# =================================================== #
+# need to set initial conditions for the first forecast
+# will use the mean number of each life stage observed in 
+# May from 1995-2018. Those observations are split among 
+# two data sets
+# ticks 1995-2005
+train.ticks <- read.csv("/projectnb/dietzelab/fosterj/Data/tick_cleaned") %>% 
+  filter(Grid == site.name) %>% 
+  mutate(month = month(DATE)) %>% 
+  filter(month == 5) %>% 
+  select(c(n_larvae, n_nymphs, n_adults))
+
+# ticks 2006-2018
+hind.ticks <- get_ticks_2006_2018(site.name)
+ticks.06.18 <- t(hind.ticks$obs) %>% 
+  as.data.frame() %>% 
+  mutate(DATE = (hind.ticks$date)) %>% 
+  mutate(month = month(DATE)) %>% 
+  filter(month == 5) %>% 
+  select(c(n_larvae, n_nymphs, n_adults))
+
+# bind together and calculate mean
+ic.ticks <- bind_rows(train.ticks, ticks.06.18) 
+ic.ticks <- round(apply(ic.ticks, 2, mean))
+
+data$ic <- ic.ticks # initial condition, put in data for jags
 
 # =================================================== #
 #       Observed met from Cary, previous months       #
@@ -135,51 +173,64 @@ met.cary$vpd <- met.cary$vpd - hist.means["vpd"]
 # =================================================== #
 #             Cary Climate Ensembles                  #
 # =================================================== #
-
+# need these ensembles to fill GEFS gaps and to run 
+# forecasts under climatology scenario 
+clim.max.temp <- cary_weather_ensembles("MAX_TEMP") 
+clim.min.temp <- cary_weather_ensembles("MIN_TEMP") 
+clim.max.rh <- cary_weather_ensembles("MAX_RH") 
+clim.min.rh <- cary_weather_ensembles("MIN_RH") 
+clim.vpd <- cary_weather_ensembles("vpd") 
+clim.cdd <- cary_weather_ensembles("cdd") 
 
 
 # =================================================== #
 #                   NOAA GEFS                         #
 # =================================================== #
+# GEFS has come in four different ways, using rnoaa,
+# noaaGEFSpoint, noaaGEFSgrid, and from the archive system
+# all have different directories, days associated
 
 # directories
 dir.gefs.rnoaa <- "/projectnb/dietzelab/fosterj/Data/GEFSrnoaa/Cary/" # from rnoaa downloads
 dir.gefs.point <- "/projectnb/dietzelab/fosterj/Data/GEFSpoint/NOAAGEFS_6hr/CARY/" # from noaaGEFSpoint
-
-# currently not operational
-# dir.gefs.grid <- "/projectnb/dietzelab/fosterj/Data/GEFSgrid/"  
+dir.gefs.grid <- "/projectnb/dietzelab/fosterj/Data/GEFSgrid/NOAAGEFS_6hr/CARY/" # from noaaGEFSgrid
+dir.gefs.arch <- "/projectnb/dietzelab/fosterj/Data/GEFSarchive/" # archived GEFS downloads
 
 # get dates from the different directories
-files.rnoaa <- list.files(dir.gefs.rnoaa)
-dates.rnoaa <- ymd(str_extract(files.rnoaa, date.pattern))
 
+# rnoaa dates
+files.rnoaa <- list.files(dir.gefs.rnoaa)
+dates.rnoaa <- str_extract(files.rnoaa, date.pattern) %>% 
+  ymd() %>% 
+  discard(is.na)
+
+# gefs point dates
 files.point <- list.files(dir.gefs.point)
 dates.point <- ymd(files.point)
 
+# gefs grid dates
+files.grid <- list.files(dir.gefs.grid)
+dates.grid <- ymd(files.grid) 
+
+# gefs archive dates
+files.arch <- list.files(dir.gefs.arch, pattern = ".csv")
+dates.arch <- str_extract(files.arch, "^\\d{8}") %>% 
+  ymd()
+
+# =================================================== #
+#                    FORECAST                         #
+# =================================================== #
 
 
-# indexing for known met and gefs
-n.adapt <- 50#00
-n.chains <- 5
-n.iter <- 100#000
-
-# forecast loop, need to check:
-# 1. if there is a new tick observation
-# 2. the latest observed weather
-every.day <- seq.Date(met.gefs.dates[1]+4, today(), by = 1) # everyday 
-forecast.start.day <- "2020-05-20" # day forecast stems from
 
 # for(i in seq_along(every.day)){
 i=1
   cat("\n\n===================================================\n\n")
   
   per <- i / length(every.day) * 100
-  cat(round(per), "percent completed\n")
+  cat(round(per), "% completed\n")
   
   current.day <- every.day[i]  # date forecast is made
-  
-  # usually run three or four days behind
-  last.noaa.date <- current.day - 4 
   
   # need to check if there is a new tick observation
   # this determines new initial condition and forecast start day
@@ -227,34 +278,27 @@ i=1
   } 
 
   # subset observed met
-  build.obs.met <- noaa.observed %>% 
-    filter(Date <= last.noaa.date) %>% 
-    filter(Date >= forecast.start.day)
+  build.obs.met <- met.cary %>% 
+    filter(DATE <= current.day) %>% 
+    filter(DATE >= forecast.start.day)
   
   # cumulative growing degree days at end of observation period
   # needed for cum.gdd calculations across GEFS 
-  end.cum.gdd <- build.obs.met$cum.gdd[nrow(build.obs.met)]
+  end.cum.gdd <- build.obs.met$cdd[nrow(build.obs.met)]
   
   # grab GEFS
-  gefs.needed <- match(ymd(last.noaa.date)+1, met.gefs.dates)
-  
-  # some gefs days did not download, 
-  # this finds the most recent day for non-existent gefs files
-  gefs.diff <- 0 # reset 
-  if(is.na(gefs.needed)){
-    # time difference between last observed date and dates we have gefs forecasts
-    lag.days <- difftime(ymd(last.noaa.date)+1, met.gefs.dates)
-    gefs.needed <- which(lag.days == min(lag.days[lag.days >= 0], na.rm = TRUE))
-    gefs.diff <- as.numeric(difftime(ymd(last.noaa.date)+1, met.gefs.dates[gefs.needed]))
+  gefs.needed <- ymd(current.day)+1
+  if(gefs.needed %in% dates.rnoaa){
+    met.gefs <- get_gefs_ens(gefs.forecast.dir, end.cum.gdd)
+  } else if(gefs.needed %in% dates.point){
+    # READ FROM POINT
+  } else if(gefs.needed %in% dates.grid){
+    # READ FROM GRID
+  } else if(gefs.needed %in% dates.arch){
+    # READ FROM ARCHIVES
   }
-  days.2.grab <- files.gefs[gefs.needed] # gefs date we need
   
-  # dir contains the gefs forecasts where each ensemble member is a separate file
-  gefs.forecast.dir <- paste0(dir.gefs, days.2.grab)
   
-  # read the dir and compile ensembles, also calculate cumulative gdd
-  # returns a list of data frames, one for each ensemble
-  met.gefs <- get_gefs_ens(gefs.forecast.dir, end.cum.gdd)
   
   # if there has been a lapse in gefs
   # need to remove the rows for which we have observations
