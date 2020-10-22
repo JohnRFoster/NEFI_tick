@@ -88,20 +88,32 @@ get_gefs_mean_prec <- function(met.gefs, met.var, scale = 0){
 #'
 #' @param dir file path to directory ensembles are stored 
 #' @param end.cum.gdd cumulative growing degree days at the end of met observations
+#' 
+#' # directories
 
-get_gefs_ens <- function(dir, end.cum.gdd){
-  ens.files <- list.files(dir)
+
+
+
+get_gefs_rnoaa <- function(date, end.cum.gdd){
+  
+  dir.gefs.rnoaa <- "/projectnb/dietzelab/fosterj/Data/GEFSrnoaa/Cary/" # from rnoaa downloads
+  day.dir <- paste0("NOAA_GEFS.CaryInstitute.", date) # file name with date 
+  ens.store <- paste0(dir.gefs.rnoaa, day.dir) # dir with individual ensembles
+  
+  ens.files <- list.files(ens.store)
   ens.files <- ens.files[grepl(".nc", ens.files)] # want only .nc files
   
   # get dimensions
-  gefs.ens <- nc_open(paste0(dir, "/", ens.files[1])) 
+  gefs.path <- file.path(ens.store, ens.files[1]) # full path to .nc 
+  gefs.ens <- nc_open(gefs.path) 
   n.var <- length(gefs.ens$var)
   var.names <- names(gefs.ens$var)
   n.days <- length(ncvar_get(gefs.ens, var.names[1]))
   
   met.gefs <- list()
   for(ens in 1:21){ # get data for each ensemble member
-    gefs.ens <- nc_open(paste0(dir, "/", ens.files[ens])) 
+    gefs.path <- file.path(ens.store, ens.files[ens]) # full path to .nc 
+    gefs.ens <- nc_open(gefs.path)  
     gefs.data <- matrix(NA, n.days, n.var)
     for(v in seq_along(var.names)){
       gefs.data[,v] <- ncvar_get(gefs.ens, var.names[v])  
@@ -110,7 +122,7 @@ get_gefs_ens <- function(dir, end.cum.gdd){
     
     gdd <- rep(NA, nrow(gefs.data))
     for(i in 1:nrow(gefs.data)){
-      gdd[i] <- max(mean(gefs.data[i, "max.temp"], gefs.data[i, "min.temp"]) - base, 0)
+      gdd[i] <- max(mean(gefs.data[i, "max.temp"], gefs.data[i, "min.temp"]) - 10, 0)
     }
     
     gefs.cum.gdd <- cumsum(c(end.cum.gdd, gdd))
@@ -120,8 +132,26 @@ get_gefs_ens <- function(dir, end.cum.gdd){
     
     met.gefs[[ens]] <- gefs.data
   }
+  
+  # the returned object is a list 
+  # each element represents an ensemble member
+  # each element is a data frame, days in rows, vars in columns
   return(met.gefs)
 }
 
+get_gefs_point <- function(date, end.cum.gdd){
+  dir.gefs.point <- "/projectnb/dietzelab/fosterj/Data/GEFSpoint/NOAAGEFS_6hr/CARY/" # from noaaGEFSpoint
+  # will have to adjust from utc to eastern
+}
+
+get_gefs_grid <- function(date, end.cum.gdd){
+  dir.gefs.grid <- "/projectnb/dietzelab/fosterj/Data/GEFSgrid/NOAAGEFS_6hr/CARY/" # from noaaGEFSgrid
+  # will have to adjust from utc to eastern
+}
+
+get_gefs_archive <- function(date, end.cum.gdd){
+  dir.gefs.arch <- "/projectnb/dietzelab/fosterj/Data/GEFSarchive/" # archived GEFS downloads
+  # will have to adjust from utc to eastern
+}
 
 
