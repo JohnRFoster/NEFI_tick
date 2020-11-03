@@ -139,19 +139,137 @@ get_gefs_rnoaa <- function(date, end.cum.gdd){
   return(met.gefs)
 }
 
-get_gefs_point <- function(date, end.cum.gdd){
-  dir.gefs.point <- "/projectnb/dietzelab/fosterj/Data/GEFSpoint/NOAAGEFS_6hr/CARY/" # from noaaGEFSpoint
-  # will have to adjust from utc to eastern
-}
+get_gefs_noaaGEFSpoint <- function(method, date, end.cum.gdd){
+  
+  # directories by method
+  if(method == "grid"){
+    dir.gefs <- "/projectnb/dietzelab/fosterj/Data/GEFSgrid/NOAAGEFS_6hr/CARY/" # from noaaGEFSgrid
+    day.dir <- as.character(date) # dir name with date, grid
+  } else if(method == "point"){
+    dir.gefs <- "/projectnb/dietzelab/fosterj/Data/GEFSpoint/NOAAGEFS_6hr/CARY/" # from noaaGEFSpoint
+    day.dir <- as.character(gsub("-", "", date)) # dir name with date, point
+  }
+  
+  ens.store <- paste0(dir.gefs, day.dir, "/00") # dir with individual ensembles
+  ens.files <- list.files(ens.store)
+  ens.files <- ens.files[grepl(".nc", ens.files)] # want only .nc files
+  
+  met.gefs <- list()
+  for(ens in seq_along(ens.files)){
+    gefs.path <- file.path(ens.store, ens.files[ens]) # full path to .nc 
+    gefs.ens <- nc_open(gefs.path)
+    
+    time.step <- ncvar_get(gefs.ens, "time") # hours since forecast date
+    time <- date + (time.step / 24) # forecast date
+    tz(time) <- "UTC" # forecasts are UTC
+    time <- with_tz(time, "America/New_York") # change to local time, keeps instance
+    
+    # get variables
+    temp <- ncvar_get(gefs.ens, "air_temperature") # units = K
+    rh <- ncvar_get(gefs.ens, "relative_humidity") # units = percent
+    # precip <- ncvar_get(gefs.ens, "precipitation_flux") # units = kg m-2 s-1
 
-get_gefs_grid <- function(date, end.cum.gdd){
-  dir.gefs.grid <- "/projectnb/dietzelab/fosterj/Data/GEFSgrid/NOAAGEFS_6hr/CARY/" # from noaaGEFSgrid
-  # will have to adjust from utc to eastern
+    met.df <- data.frame(time = time,
+                         temp = temp - 273.15, # units = C
+                         rh = rh) # units = percent
+                         # precip = precip)
+    
+    gefs.daily <- met.df %>% 
+      mutate(day = floor_date(time, "day")) %>%
+      group_by(day) %>% 
+      summarise(max.temp = max(temp),
+                min.temp = min(temp),
+                max.rh = max(rh),
+                min.rh = min(rh)) %>% 
+      filter(day >= date)
+    
+    gdd <- rep(NA, nrow(gefs.daily))
+    for(i in 1:nrow(gefs.daily)){
+      gdd[i] <- max(mean(pull(gefs.daily[i, "max.temp"]),
+                         pull(gefs.daily[i, "min.temp"])) - 10, 0)
+    }
+    
+    gefs.cum.gdd <- cumsum(c(end.cum.gdd, gdd))
+    gefs.daily <- gefs.daily %>% 
+      mutate(cum.gdd = gefs.cum.gdd[-1]) %>% 
+      select(-day)
+    
+    # some ensembles from grid method only have 16 days, 
+    # so lets get rid of those and keep the 35 day forecasts
+    if(method == "grid"){
+      if(nrow(gefs.daily) < 17) gefs.daily <- NULL
+    }
+    
+    met.gefs[[ens]] <- gefs.daily
+  }
+  
+  # the returned object is a list 
+  # each element represents an ensemble member
+  # each element is a data frame, days in rows, vars in columns
+  met.gefs <- purrr::compact(met.gefs)
+  return(met.gefs)
 }
 
 get_gefs_archive <- function(date, end.cum.gdd){
   dir.gefs.arch <- "/projectnb/dietzelab/fosterj/Data/GEFSarchive/" # archived GEFS downloads
-  # will have to adjust from utc to eastern
+  pattern <- as.character(gsub("-", "", date)) # beginning of csv
+  
+  ens.files <- list.files(dir.gefs.arch)
+  ens.files <- ens.files[grepl(".csv", ens.files)] # want only .csv files
+
+  csv.index <- which(str_detect(ens.files, pattern)) # index of file we want
+
+  gefs.csv <- read.csv(paste0(dir.gefs.arch, ens.files[csv.index]))  # read file
+  gefs.csv$forecast.date <- ymd_hms(gefs.csv$forecast.date)
+  tz(gefs.csv$forecast.date) <- "GMT" # forecasts are GMT, set in process script
+  gefs.csv$forecast.date <- with_tz(gefs.csv$forecast.date, "America/New_York") # change to local time, keeps instance
+  
+  # number of ensembles
+  n.ens <- gefs.csv %>% 
+    pull(ensembles) %>% 
+    unique() %>% 
+    length()
+  
+  # subset and filter 
+  gefs.daily <- gefs.csv %>% 
+    select(all_of(c("forecast.date", "ensembles", "tmp2m", "rh2m"))) %>% 
+    mutate(day = floor_date(forecast.date, "day")) %>%
+    mutate(tmp2m = tmp2m - 273.15) %>%
+    group_by(ensembles, day) %>% 
+    summarise(max.temp = max(tmp2m),
+              min.temp = min(tmp2m),
+              max.rh = max(rh2m),
+              min.rh = min(rh2m)) %>% 
+    filter(day >= date)
+  
+  met.gefs <- list()
+  for(ens in 1:n.ens){
+    gefs.subset <- gefs.daily %>% 
+      filter(ensembles == ens)
+    
+    gdd <- rep(NA, nrow(gefs.subset))
+    for(i in 1:nrow(gefs.subset)){
+      gdd[i] <- max(mean(pull(gefs.subset[i, "max.temp"]), 
+                         pull(gefs.subset[i, "min.temp"])) - 10, 0)
+    }
+    
+    gefs.cum.gdd <- cumsum(c(end.cum.gdd, gdd))
+    gefs.subset <- gefs.subset %>% 
+      mutate(cum.gdd = gefs.cum.gdd[-1]) %>% 
+      select(-day)
+    
+    
+    
+    met.gefs[[ens]] <- gefs.subset
+  }
+  
+  
+  
+  # the returned object is a list 
+  # each element represents an ensemble member
+  # each element is a data frame, days in rows, vars in columns
+  return(met.gefs)
+  
 }
 
 
