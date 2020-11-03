@@ -23,7 +23,7 @@ library(boot)
 
 
 
-predict_one <- function(type, site, met.variable, params, ic, data, process.type,
+predict_one <- function(type, site, met.variable, params, ic, data,
                         A_func = NULL, A = NULL, dir = "", HB = FALSE){
   
   source(paste0(dir, "Functions/site_data_met.R"))
@@ -105,13 +105,7 @@ predict_one <- function(type, site, met.variable, params, ic, data, process.type
       }
       
       est.mvnorm <- rep(NA, 3)
-      if(process.type == "multi"){
-        est.mvnorm <- rmvnorm(1,Ex,ua$SIGMA[,,m])  
-      } else if(process.type == "independent"){
-        est.mvnorm[1] <- rnorm(1,Ex[1],ua$tau.l[m])  
-        est.mvnorm[2] <- rnorm(1,Ex[2],ua$tau.n[m])  
-        est.mvnorm[3] <- rnorm(1,Ex[3],ua$tau.a[m])  
-      }
+      est.mvnorm <- rmvnorm(1,Ex,ua$SIGMA[,,m])  
       
       b.larva <- rbinom(1, 1, obs.prob$theta.larva[m,t+1])
       b.nymph <- rbinom(1, 1, obs.prob$theta.nymph[m,t+1])
