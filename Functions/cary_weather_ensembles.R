@@ -43,7 +43,7 @@ cary_weather_ensembles <- function(var){
   met.sample <- met %>%  
     select(all_of(c("Year", "doy", var))) %>% 
     pivot_wider(names_from = doy, 
-                values_from = var)
+                values_from = all_of(var))
   
 }
 
