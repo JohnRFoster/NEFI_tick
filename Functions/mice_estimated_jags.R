@@ -21,11 +21,11 @@ mice_estimated_jags <- function(site.run){
   
   # load mice model output
   if(site.run == "Green Control"){
-    load("../FinalOut/GreenControlMR/GreenControlMR_1_5.RData")
+    load("/projectnb/dietzelab/fosterj/FinalOut/GreenControlMR/GreenControlMR_1_5.RData")
   } else if(site.run == "Henry Control"){
-    load("../FinalOut/HenryControlMR/HenryControlMR_1_6.RData")
+    load("/projectnb/dietzelab/fosterj/FinalOut/HenryControlMR/HenryControlMR_1_6.RData")
   } else {
-    load("../FinalOut/TeaControlMR/TeaControlMR_1_6.RData")
+    load("/projectnb/dietzelab/fosterj/FinalOut/TeaControlMR/TeaControlMR_1_6.RData")
   }
   
   predict <- as.matrix(out$predict)
