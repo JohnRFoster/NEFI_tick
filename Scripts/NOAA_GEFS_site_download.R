@@ -43,7 +43,7 @@ if(n.cores > 1) run.par <- TRUE
 cat("Running in parallel:", run.par, "\n")
 
 # method for download, default is point
-method <- "point"
+method <- "grid"
 # if(nrow(neon_sites) > 3 | run.par) method <- "grid"
 cat("Download method:", method, "\n")
 
