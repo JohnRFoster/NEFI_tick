@@ -10,7 +10,7 @@
 
 gefs_prior <- function(days){
   
-  met <- read.csv("../Cary_Met_Data_Daily.csv")
+  met <- read.csv("/projectnb/dietzelab/fosterj/Data/Cary_Met_Data_Daily.csv")
   met <- met[, c("DATE","MAX_TEMP", "MIN_TEMP", "MAX_RH", "MIN_RH", "TOT_PREC")]
   met$DATE <- as.Date(as.character(met$DATE), format = c("%m/%d/%Y"))
   met <- met %>% 
@@ -64,6 +64,9 @@ gefs_prior <- function(days){
 #'
 #' @param met.gefs list gefs ensemble, each list element is a data frame with met variables as columns
 #' @param met.var met variable to extract, must match column names in met.gefs
+#' 
+
+library(LaplacesDemon)
 
 get_gefs_mean_prec <- function(met.gefs, met.var, scale = 0){
   add.2.obs <- NULL
@@ -79,7 +82,7 @@ get_gefs_mean_prec <- function(met.gefs, met.var, scale = 0){
   }
   
   mu <- apply(dat, 2, mean) # mean vector
-  prec.mat <- solve(cov(dat)) # precision matrix
+  prec.mat <- solve(cov(dat), tol = 1e-30) # precision matrix
   return(list(mu = mu, prec = prec.mat, add.2.obs = add.2.obs))
 }
 
@@ -90,9 +93,6 @@ get_gefs_mean_prec <- function(met.gefs, met.var, scale = 0){
 #' @param end.cum.gdd cumulative growing degree days at the end of met observations
 #' 
 #' # directories
-
-
-
 
 get_gefs_rnoaa <- function(date, end.cum.gdd){
   
