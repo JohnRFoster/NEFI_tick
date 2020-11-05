@@ -65,16 +65,16 @@ create_ncdf_tick <- function(ncfname, preds, params, start.date, data.assimilati
                          units = "",
                          vals = n.params,
                          longname = "parameter posteriors")
-  da.dim <- ncdim_def("data_assimilation",
+  da.dim <- ncdim_def("DA",
                       units = "boolean",
                       longname = "timestep when data is assimilated",
                       vals = timestep)
-  dimnchar   <- ncdim_def("nchar",   "", 
-                          1:nchar(as.character(time[1])), 
-                          create_dimvar = FALSE)
-  dimnchar.params   <- ncdim_def("nchar_params",   "",
-                          1:max.param.char,
-                          create_dimvar = FALSE)
+  dimnchar <- ncdim_def("nchar",   "", 
+                        1:nchar(as.character(time[1])), 
+                        create_dimvar = FALSE)
+  dimnchar.params <- ncdim_def("nchar_params",   "",
+                               1:max.param.char,
+                               create_dimvar = FALSE)
   
   # Define variables
   fillvalue <- 1e32 # missing value
