@@ -11,10 +11,6 @@
 #   the forecast period.                              #   
 # =================================================== #
 
-use.gefs <- TRUE # do we use gefs (if false we climate ensembles)
-weather.dir <- ifelse(use.gefs, "GEFS", "Climate")
-latency <- 31    # data latency
-
 library(rjags)
 library(tidyverse)
 library(lubridate)
@@ -30,7 +26,21 @@ source("Functions/convergence_check.R")
 source("Functions/scale_met_forecast.R")
 source("Functions/cary_weather_ensembles.R")
 source("Functions/create_ncdf_tick.R")
+source("Functions/open_ncdf_tickFX.R")
 source("Models/tickForecastFilter_monthEffectLifeStage.R")
+
+# =================================================== #
+#                 Experiment set-up                   #
+# =================================================== #
+
+use.gefs <- TRUE # do we use gefs (if false we climate ensembles)
+weather.dir <- ifelse(use.gefs, "GEFS", "Climate")
+latency <- 1    # data latency
+
+restart <- TRUE # do we need to start sometime after 2020-05-19
+
+forecast.start.day <- "2020-05-19" # day forecast stems from
+every.day <- seq.Date(ymd(forecast.start.day), today(), by = 1) # everyday 
 
 date.pattern <- "\\d{4}-\\d{2}-\\d{2}"
 
@@ -90,8 +100,6 @@ n.adapt <- NULL
 n.chains <- 5
 n.iter <- 50000
 
-forecast.start.day <- "2020-05-19" # day forecast stems from
-every.day <- seq.Date(ymd(forecast.start.day), today(), by = 1) # everyday
 
 # =================================================== #
 #                Initial Conditions                   #
@@ -215,12 +223,32 @@ dates.arch <- str_extract(files.arch, "^\\d{8}") %>%
   ymd()
 
 
-
-
 # =================================================== #
 #                    FORECAST                         #
 # =================================================== #
 
+# are we starting the forecast after 2020-05-19?
+if(restart){
+  
+  # last day there is a forecast saved
+  forecast.start.day <- last(list.files(out.dir))
+  restart.day <- ymd(forecast.start.day) - 1
+  nc.fx.dir <- file.path(out.dir, forecast.start.day)
+  
+  # pull out forecast, update data for jags
+  da.fx <- get_fx_da(nc.fx.dir, forecast.start.day) 
+  data <- update_data(da.fx$params.nc, 1:12)
+  data$ic <- da.fx$ic
+  
+  # if we already have an observation, update with most recent day observation was posted
+  index <- max(which(posted.days < forecast.start.day))
+  if(is.integer(index)) y.vec <- obs[,index]
+
+  # reset every.day
+  every.day <- seq.Date(ymd(forecast.start.day), today(), by = 1) # everyday
+  
+  cat("Restarting at", as.character(forecast.start.day), "\n")
+}
 
 
 for(i in seq_along(every.day)){
@@ -248,49 +276,15 @@ for(i in seq_along(every.day)){
     # grab forecast from yesterday
     yesterday <- current.day - 1
     yest.dir <- file.path(out.dir, yesterday) # where forecasts are stored
-    files.forecast <- list.files(yest.dir) 
     
-    # assimilate forecast from climate ensembles
-    if(any(grepl("clim", files.forecast))){
-      files.forecast <- files.forecast[grep("clim", files.forecast)]
-      nc <- nc_open(file.path(yest.dir, files.forecast[1])) # read nc file
-      nrow <- nrow(ncvar_get(nc, "larvae")) # for dimensions
-      params.nc <- matrix(0, 1, length(params.nc.names))
-      colnames(params.nc) <- ncvar_get(nc, "parameter_names") # don't change
-      nc.larva <- nc.nymph <- nc.adult <- matrix(NA, nrow, length(files.forecast))
-      for(cf in seq_along(files.forecast)){
-        nc <- nc_open(file.path(yest.dir, files.forecast[cf])) # read nc file
-        f.days <- ncvar_get(nc, "time")     # dates for each forecast
-        f.2.grab <- which(current.day == f.days) # the day we need
-        nc.larva[,cf] <- ncvar_get(nc, "larvae")[,f.2.grab] # larva forecasts
-        nc.nymph[,cf] <- ncvar_get(nc, "nymph")[,f.2.grab]  # nymph forecasts
-        nc.adult[,cf] <- ncvar_get(nc, "adult")[,f.2.grab]  # adult forecasts
-        params.ens <- ncvar_get(nc, "parameter_samples")
-        colnames(params.ens) <- ncvar_get(nc, "parameter_names") # don't change
-        params.nc <- rbind(params.nc, params.ens)
-      }
-      params.nc <- params.nc[-1,] # remove first row from initialization above
-    } else {
-      nc <- nc_open(file.path(yest.dir, files.forecast[1])) # read nc file
-      f.days <- ncvar_get(nc, "time")     # dates for each forecast
-      f.2.grab <- which(current.day == f.days) # the day we need
-      nc.larva <- ncvar_get(nc, "larvae")[,f.2.grab] # larva forecasts
-      nc.nymph <- ncvar_get(nc, "nymph")[,f.2.grab]  # nymph forecasts
-      nc.adult <- ncvar_get(nc, "adult")[,f.2.grab]  # adult forecasts
-      params.nc <- ncvar_get(nc, "parameter_samples")
-      colnames(params.nc) <- ncvar_get(nc, "parameter_names") # don't change
-    }
+    # get the ic and params from the correct forecast
+    da.fx <- get_fx_da(yest.dir, current.day)
     
-    # pull out median predictions for DA
-    larva.m <- median(nc.larva)
-    nymph.m <- median(nc.nymph)
-    adult.m <- median(nc.adult)
-
     # update posteriors
-    data <- update_data(params.nc, 1:12)	
+    data <- update_data(da.fx$params.nc, 1:12)	
     
     # initial condition is median of forecast
-    data$ic <- c(larva.m, nymph.m, adult.m)
+    data$ic <- da.fx$ic 
     
     # set forecast.start.day
     forecast.start.day <- new.start.day
