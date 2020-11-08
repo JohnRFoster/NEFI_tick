@@ -2,7 +2,7 @@ library(plantecophys)
 library(dplyr)
 library(lubridate)
 
-cary_weather_ensembles <- function(var){
+cary_weather_ensembles <- function(day.of.year){
   met <- read.csv("/projectnb/dietzelab/fosterj/Data/Cary_Met_Data_Daily.csv")
   met <- met %>% 
     mutate(DATE = mdy(DATE)) %>% 
@@ -40,10 +40,31 @@ cary_weather_ensembles <- function(var){
   
   met$cdd <- cum.gdd
 
-  met.sample <- met %>%  
-    select(all_of(c("Year", "doy", var))) %>% 
-    pivot_wider(names_from = doy, 
-                values_from = all_of(var))
+  clim.ens <- list()
+  for(ens in seq_along(year)){
+    met.sample <- met %>%  
+      select(-DATE) %>%
+      filter(Year == year[ens]) %>% 
+      filter(doy > day.of.year) %>% 
+      filter(doy <= min(day.of.year + 35, 366)) %>% 
+      rename(max.temp = MAX_TEMP,
+             min.temp = MIN_TEMP,
+             max.rh = MAX_RH,
+             min.rh = MIN_RH,
+             cum.gdd = cdd) %>% 
+      select(-c(Year, doy))
+    
+    # some historical data is missing, set those days to the mean in the ensemble
+    for(c in 1:ncol(met.sample)){
+      if(any(is.na(met.sample[,c]))){
+        fix <- which(is.na(met.sample[,c]))
+        met.sample[fix,c] <- mean(met.sample[,c], na.rm = TRUE)
+      }
+    }
+    clim.ens[[ens]] <- met.sample 
+  }
   
+  return(clim.ens)  
 }
+
 
