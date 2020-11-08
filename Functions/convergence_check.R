@@ -67,6 +67,9 @@ convergence_check <- function(jags.out, model, monitor, n.iter, print = FALSE,
     out$predict <- ecoforecastR::mat2mcmc.list(mfit[, c(chain.col, pred.cols)])
     out$params <- ecoforecastR::mat2mcmc.list(mfit[, -pred.cols])
     
+    params.summary <- summary(out$params)
+    iterations <- params.summary$end
+    
     # convergence check on parameters
     cat("Calculating PSRF\n")
     GBR.vals <- gelman.diag(out$params, multivariate = FALSE)
@@ -78,7 +81,7 @@ convergence_check <- function(jags.out, model, monitor, n.iter, print = FALSE,
     cat("Determining burnin\n")
     GBR <- gelman.plot(out$params)
     burnin <- GBR$last.iter[tail(which(apply(GBR$shrink[,,2]>GBR.thresh,1,any)),1)+1]
-    if(is.na(burnin)){
+    if(is.na(burnin) | burnin > iterations*0.75){
       cat("Model not converged!\n")
     } else {
       cat("Burnin after:", burnin, "iterations\n")  
@@ -91,6 +94,15 @@ convergence_check <- function(jags.out, model, monitor, n.iter, print = FALSE,
       min.index <- which(effect.size == min(effect.size))
       print(effect.size[min.index])
     }
+    
+    # if converged move on after too many calls (ignoring effective size)
+    if(converge & counter > 25){
+      cat("Convergence:", converge, "\n", 
+          "ATTENTION: Moving on because effective sample size is not increasing fast enough!\n")
+      
+    }
+    
+    
   }
   return(out)
 }
