@@ -99,6 +99,7 @@ convergence_check <- function(jags.out, model, monitor, n.iter, print = FALSE,
     if(converge & counter > 25){
       cat("Convergence:", converge, "\n", 
           "ATTENTION: Moving on because effective sample size is not increasing fast enough!\n")
+      enough.samples <- TRUE
       
     }
     
