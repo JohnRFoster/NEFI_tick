@@ -22,11 +22,8 @@ library(xlsx)
 source("Functions/gefs_prior_functions.R")
 source("Functions/ticks_2020.R")
 source("Functions/get_ticks_2006_2018.R")
-source("Functions/convergence_check.R")
 source("Functions/scale_met_forecast.R")
 source("Functions/cary_weather_ensembles.R")
-source("Functions/create_ncdf_tick.R")
-source("Functions/open_ncdf_tickFX.R")
 source("Models/tickForecastFilter_monthEffectLifeStage.R")
 
 # =================================================== #
@@ -35,7 +32,7 @@ source("Models/tickForecastFilter_monthEffectLifeStage.R")
 
 use.gefs <- TRUE # do we use gefs (if false we climate ensembles)
 weather.dir <- ifelse(use.gefs, "GEFS", "Climate")
-latency <- 1    # data latency
+latency <- 14    # data latency
 
 restart <- TRUE # do we need to start sometime after 2020-05-19
 
@@ -236,6 +233,7 @@ if(restart){
   nc.fx.dir <- file.path(out.dir, forecast.start.day)
   
   # pull out forecast, update data for jags
+  source("Functions/open_ncdf_tickFX.R")
   da.fx <- get_fx_da(nc.fx.dir, forecast.start.day) 
   data <- update_data(da.fx$params.nc, 1:12)
   data$ic <- da.fx$ic
@@ -278,6 +276,7 @@ for(i in seq_along(every.day)){
     yest.dir <- file.path(out.dir, yesterday) # where forecasts are stored
     
     # get the ic and params from the correct forecast
+    source("Functions/open_ncdf_tickFX.R")
     da.fx <- get_fx_da(yest.dir, current.day)
     
     # update posteriors
@@ -421,6 +420,7 @@ for(i in seq_along(every.day)){
                                  use.climate)
     
     # check convergence
+    source("Functions/convergence_check.R")
     out <- convergence_check(jags.out = mcmc.model$jags.out,
                              model = mcmc.model$compiled.model,
                              monitor = mcmc.model$monitor,
@@ -451,6 +451,7 @@ for(i in seq_along(every.day)){
     data.assimilation <- as.numeric(complete.cases(t(data$y)))
     
     # write netcdf 
+    source("Functions/create_ncdf_tick.R")
     create_ncdf_tick(ncfname = ncfname,
                      preds = preds,
                      params = params,
