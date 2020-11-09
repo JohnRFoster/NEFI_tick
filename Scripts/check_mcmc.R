@@ -9,7 +9,7 @@ type <- "ind"
 start <- 1
 num.chains <- c(1, 2, 3, 4, 5)
 
-force <- FALSE
+force <- TRUE
 cat("force =", force, "\n")
 
 gbr.thresh <- 1.06        # convergence threshold
