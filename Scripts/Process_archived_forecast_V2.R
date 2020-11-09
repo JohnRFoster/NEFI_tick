@@ -8,12 +8,12 @@ nens <- 21
 top.dir <- "/projectnb/dietzelab/fosterj/"
 working_directory <- paste0(top.dir, "Data/GEFSarchive/")
 
-day_list <- c('20200520')
-day_vec <- as.character(20200522:202005228)
+day_vec <- as.character(20200622)
 
 # read array number and subset day_vec
-array.num <- as.numeric(Sys.getenv("SGE_TASK_ID"))
-day_list <- day_vec[array.num]
+# array.num <- as.numeric(Sys.getenv("SGE_TASK_ID"))
+# day_list <- day_vec[array.num]
+day_list <- day_vec
 
 cat("Extracting", day_list, "\n\n")
 
