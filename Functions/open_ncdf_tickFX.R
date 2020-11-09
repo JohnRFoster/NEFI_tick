@@ -14,6 +14,7 @@ get_fx_da <- function(dir, day.2.grab){
     params.nc <- matrix(0, 1, length(params.nc.names))
     colnames(params.nc) <- ncvar_get(nc, "parameter_names") # don't change
     nc.larva <- nc.nymph <- nc.adult <- matrix(NA, nrow, length(files.forecast))
+    nc_close(nc)
     for(cf in seq_along(files.forecast)){
       nc <- nc_open(file.path(dir, files.forecast[cf])) # read nc file
       f.days <- ncvar_get(nc, "time")     # dates for each forecast
@@ -24,6 +25,7 @@ get_fx_da <- function(dir, day.2.grab){
       params.ens <- ncvar_get(nc, "parameter_samples")
       colnames(params.ens) <- ncvar_get(nc, "parameter_names") # don't change
       params.nc <- rbind(params.nc, params.ens)
+      nc_close(nc)
     }
     params.nc <- params.nc[-1,] # remove first row from initialization above
   } else {
@@ -35,6 +37,7 @@ get_fx_da <- function(dir, day.2.grab){
     nc.adult <- ncvar_get(nc, "adult")[,f.2.grab]  # adult forecasts
     params.nc <- ncvar_get(nc, "parameter_samples")
     colnames(params.nc) <- ncvar_get(nc, "parameter_names") # don't change
+    nc_close(nc)
   }
   
   # pull out median predictions for DA
